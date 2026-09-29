@@ -1,0 +1,258 @@
+<div class="overview-prototype">
+  <div class="page-heading">
+    <div>
+      <span class="eyebrow"> {{ "FINANCIAL DECISION INTELLIGENCE" | t }} </span>
+      <h1>{{ "Executive Overview" | t }}</h1>
+      <p class="muted">
+        {{ "A clear view of your financial plan. Evidence for your next decision." | t }}
+      </p>
+    </div>
+    <div class="overview-action-card">
+      <span class="overview-orbit" aria-hidden="true">✦</span>
+      <p>{{'Explore the next decision'|t}}</p>
+      <div class="actions">
+        <button class="primary" (click)="navigate.emit({page:'decisions'})">
+          {{ "Build a scenario" | t }}</button
+        ><button class="secondary" (click)="navigate.emit({page:'briefs'})">
+          {{ "Decision Briefs" | t }}
+        </button>
+      </div>
+    </div>
+  </div>
+  @if(busy()){
+  <div class="loading-state" role="status">{{ "Loading financial evidence…" | t }}</div>
+  } @if(error()){
+  <div class="error" role="alert">
+    {{error()|t}} <button (click)="load()">{{ "Retry" | t }}</button>
+  </div>
+  } @if(result();as r){
+  <div class="evidence-strip">
+    <span class="status-dot"></span><strong> {{ "Saved financial engine result" | t }} </strong
+    ><span>{{run()?.title}}</span><bdi>{{r.periods[0].period}} — {{last?.period}}</bdi
+    ><span class="badge">{{r.currency}}</span>
+  </div>
+  <div class="executive-kpis">
+    <ui-metric
+      tone="capital"
+      icon="wallet"
+      label="Ending available cash"
+      [value]="last?.closingCash"
+      [currency]="r.currency"
+      note="Last modeled month"
+    />
+    <ui-metric
+      tone="reserve"
+      icon="shield"
+      label="Minimum projected cash"
+      [value]="r.minimumCash?.amount"
+      [currency]="r.currency"
+      [note]="r.minimumCash?.period??'Not available'"
+    />
+    <ui-metric
+      tone="performance"
+      icon="activity"
+      label="Operating result"
+      [value]="last?.operatingResult"
+      [currency]="r.currency"
+      note="Operating Result is not Net Profit."
+    />
+    <ui-metric
+      tone="neutral"
+      icon="movement"
+      label="Net cash movement"
+      [value]="last?.netCashMovement"
+      [currency]="r.currency"
+      note="Last modeled month"
+    />
+  </div>
+  <div class="decision-canvas">
+    <section class="trajectory-panel">
+      <financial-chart [periods]="r.periods" [currency]="r.currency" />
+      <details class="overview-baseline-details">
+        <summary>{{'Inspect baseline →'|t}}</summary>
+        <div class="trajectory-foot">
+          <ui-metric
+            label="Revenue"
+            [value]="last?.revenue"
+            [currency]="r.currency"
+            note="Last modeled month"
+          />
+          <ui-metric
+            label="Operating costs"
+            [value]="last?.operatingExpenses"
+            [currency]="r.currency"
+            note="Last modeled month"
+          />
+          <button
+            class="secondary"
+            (click)="navigate.emit({page:'planning',records:{run:run()!.id}})"
+          >
+            {{'Inspect baseline →'|t}}
+          </button>
+        </div>
+      </details>
+    </section>
+    <aside class="decision-rail">
+      <section
+        class="signal-panel"
+        [class.has-breach]="r.firstReserveBreach||r.firstNegativePeriod"
+      >
+        <span class="eyebrow">{{'BASELINE LIQUIDITY'|t}}</span>
+        <h2>{{'Cash watch'|t}}</h2>
+        <dl>
+          <div>
+            <dt>{{'First negative closing cash'|t}}</dt>
+            <dd>
+              <bdi
+                >{{(r.firstNegativePeriod??(r.minimumCash?'None in horizon':'Not
+                available'))|t}}</bdi
+              >
+            </dd>
+          </div>
+          <div>
+            <dt>{{'First reserve breach'|t}}</dt>
+            <dd>
+              <bdi
+                >{{(r.reservePolicy?.minimum!=null?(r.firstReserveBreach??(r.minimumCash?'None in
+                horizon':'Not available')):'No reserve policy')|t}}</bdi
+              >
+            </dd>
+          </div>
+        </dl>
+        <p>{{'Status applies only to this saved baseline, not every possible outcome.'|t}}</p>
+      </section>
+      <section class="next-action-panel">
+        <span class="eyebrow">{{'NEXT DECISION'|t}}</span>
+        @if(recentScenario();as scenario){
+        <h2>{{'Latest scenario impact'|t}}</h2>
+        <ui-metric
+          label="Change in minimum cash"
+          [value]="scenario.comparison.minimumCash.difference"
+          [currency]="scenario.manifest.currency"
+          note="Scenario minus baseline"
+        />
+        <p>{{'Compared with the scenario’s own pinned baseline.'|t}}</p>
+        <button
+          class="primary"
+          (click)="navigate.emit({page:'decisions',records:{run:scenarios()[0].id}})"
+        >
+          {{'Review this decision'|t}}
+        </button>
+        }@else{
+        <h2>{{'Explore the next decision'|t}}</h2>
+        <p>{{'Test an explicit change against a published baseline.'|t}}</p>
+        <button class="primary" (click)="navigate.emit({page:'decisions'})">
+          {{'Build a scenario'|t}}
+        </button>
+        }
+      </section>
+    </aside>
+  </div>
+  } @else if(!busy()&&!error()) {
+  <section class="empty-feature">
+    <span class="empty-symbol">↗</span>
+    <div>
+      <span class="eyebrow"> {{ "START WITH A TRUSTED BASELINE" | t }} </span>
+      <h2>{{ "Your next decision starts here." | t }}</h2>
+      <p>
+        {{ "Bring in your financial data, review its meaning and calculate your first baseline." | t
+        }}
+      </p>
+      <div class="actions">
+        <button class="primary" (click)="navigate.emit({page:'planning'})">
+          {{ "Build financial baseline" | t }}</button
+        ><button class="secondary" (click)="navigate.emit({page:'imports'})">
+          {{ "Import financial data" | t }}
+        </button>
+      </div>
+    </div>
+  </section>
+  } @if(!busy()&&!error()){
+  <div class="overview-columns">
+    <section class="card">
+      <div class="section-heading">
+        <h2>{{ "Risk & constraints" | t }}</h2>
+        <button class="text-button" (click)="navigate.emit({page:'stress'})">
+          {{ "Open Risk Center →" | t }}
+        </button>
+      </div>
+      @if(brief();as b){
+      <p class="muted">
+        {{'Risk evidence belongs to its saved brief and may use a different baseline from the latest
+        financial result.'|t}}
+      </p>
+      <p class="muted">
+        {{ "From the latest saved decision brief. These findings apply to its pinned runs and
+        policy." | t }}
+      </p>
+      @for(o of b.options;track o.ref.id){@for(f of o.risk.findings;track f.id){
+      <article class="risk-summary" [attr.data-severity]="f.severity">
+        <span class="badge">{{f.severity|t}}</span><strong>{{o.label}}</strong>
+        <p>{{f.explanation|t}}</p>
+        <small><bdi>{{f.firstPeriod}} — {{f.lastPeriod}}</bdi> · {{f.ruleId}}</small>
+      </article>
+      }@empty{
+      <p class="empty-inline">
+        {{o.label}} · {{'No breach findings under the configured rules.'|t}}
+      </p>
+      }}} @else{
+      <div class="empty-state">
+        <h3>{{ "No evaluated risk brief yet" | t }}</h3>
+        <p>
+          {{ "Run explicit stress cases against a reviewed financial policy to inspect threshold
+          findings." | t }}
+        </p>
+      </div>
+      }
+    </section>
+    <section class="card">
+      <div class="section-heading">
+        <h2>{{ "Recent scenarios" | t }}</h2>
+        <button class="text-button" (click)="navigate.emit({page:'decisions'})">
+          {{ "View scenarios →" | t }}
+        </button>
+      </div>
+      @for(s of scenarios();track s.id){
+      <div class="list-record">
+        <span class="badge"> {{ "Calculated" | t }} </span>
+        <h3>
+          <button (click)="navigate.emit({page:'decisions',records:{run:s.id}})">
+            {{s.title}}
+          </button>
+        </h3>
+        <small><bdi>{{s.id}}</bdi></small>
+      </div>
+      }@empty{
+      <div class="empty-state">
+        <h3>{{ "No calculated scenarios yet" | t }}</h3>
+        <p>
+          {{ "Explore a decision against a published baseline without changing the original plan." |
+          t }}
+        </p>
+      </div>
+      }
+    </section>
+  </div>
+  } @if(!busy()&&!error()){
+  <div class="evidence-counters" [attr.aria-label]="'Saved evidence'|t">
+    <span><strong>{{scenarios().length}}</strong> {{'Recent scenarios shown'|t}}</span>
+    <span><strong>{{briefs().length}}</strong> {{'Recent briefs available'|t}}</span>
+    <span>{{'Forecasting is optional'|t}}</span>
+  </div>
+  }
+  <section class="brief-launch">
+    <div>
+      <span class="eyebrow"> {{ "EXPLAINABLE DECISION EVIDENCE" | t }} </span>
+      <h2>{{ "From financial results to a clear decision brief." | t }}</h2>
+      <p>
+        {{ "Compare alternatives, review assumptions and keep every important number connected to
+        its source." | t }}
+      </p>
+    </div>
+    <button class="primary" (click)="navigate.emit({page:'briefs'})">
+      {{ "Open Decision Briefs →" | t }}
+    </button>
+  </section>
+
+  <div class="overview-activity-slot"><ng-content /></div>
+</div>

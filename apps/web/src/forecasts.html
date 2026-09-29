@@ -1,0 +1,316 @@
+<workflow-stages
+  [labels]="['Historical evidence','Eligibility','Forecast review','Hybrid baseline']"
+  [active]="composition()?3:artifact()?2:evidence()?1:0"
+/>
+<div class="density-page forecast-density">
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow">{{'STATISTICAL FORECASTING'|t}}</p>
+      <h1>{{'Forecasting'|t}}</h1>
+      <p>
+        {{'Forecasting is optional. Reviewed assumptions and known schedules remain valid planning
+        inputs.'|t}}
+      </p>
+    </div>
+  </div>
+  <div class="density-grid">
+    <section class="card density-start">
+      <span class="eyebrow">{{'NEXT VALID ACTION'|t}}</span>
+      <h2>{{'Historical evidence'|t}}</h2>
+      <dl class="density-stats">
+        <div>
+          <dt>{{'Confirmed planning version'|t}}</dt>
+          <dd>{{versions().length}}</dd>
+        </div>
+        <div>
+          <dt>{{'Selected versions'|t}}</dt>
+          <dd>{{selected.size}}</dd>
+        </div>
+      </dl>
+      <p>
+        {{'A confirmed version is not proof of forecast eligibility. Monthly Actuals must pass the
+        evidence checks.'|t}}
+      </p>
+      @if(workspace.kind==='demo'){
+      <p>{{'Use a company workspace with confirmed historical data to run forecasts.'|t}}</p>
+      }@else{
+      <button
+        class="primary"
+        [disabled]="busy()||!versions().length"
+        (click)="forecastForm.open=true;forecastForm.scrollIntoView({block:'start'})"
+      >
+        {{'Choose history and check eligibility'|t}}</button
+      >}
+      <button class="secondary" (click)="navigate.emit({page:'imports',records:{}})">
+        {{'Data & Imports'|t}}
+      </button>
+    </section>
+    <section class="card density-preview">
+      <span class="eyebrow">{{'Forecast status'|t}}</span>
+      <h2>{{(artifact()?'Forecast review':'Forecast not calculated')|t}}</h2>
+      @if(artifact();as a){@if(a.result.points.length){<financial-chart
+        [forecastPoints]="a.result.points"
+        [currency]="a.history.currency"
+        title="Forecasting"
+      />}
+      <p>{{a.result.reason|t}}</p>
+      <p>{{a.result.uncertainty.reason|t}}</p>
+      } @else{
+      <p class="density-note">
+        {{'No forecast output is shown until historical evidence has been checked and a model run
+        has completed.'|t}}
+      </p>
+      <ul class="density-checklist">
+        <li>{{'Continuous monthly Actuals for one series'|t}}</li>
+        <li>{{'History length and business changes reviewed'|t}}</li>
+        <li>{{'Review model evidence before approval'|t}}</li>
+      </ul>
+      } @if(evidence();as e){
+      <p class="badge">{{e.eligibility.status.replaceAll('_',' ')|t}}</p>
+      <p>{{e.eligibility.reason|t}}</p>
+      }@else{<span class="badge">{{'Eligibility not checked'|t}}</span>}
+    </section>
+    <section class="card density-context">
+      <h2>{{'Available planning context'|t}}</h2>
+      @for(v of versions().slice(0,4);track v.id){
+      <div class="density-row">
+        <strong>{{v.title}}</strong>
+        <details>
+          <summary>{{'Source assignments and lineage'|t}}</summary>
+          <bdi>{{v.id}}</bdi>
+        </details>
+      </div>
+      }@empty{
+      <p>
+        {{'No confirmed versions yet. Import and review company data, or continue with explicit
+        planning assumptions.'|t}}
+      </p>
+      }
+      <button (click)="usePlanning.emit({})">{{'Financial Baseline'|t}}</button>
+    </section>
+    <div class="density-wide">
+      <record-history
+        [expanded]="true"
+        title="Previous forecast jobs"
+        [records]="jobs()"
+        (openRecord)="navigate.emit({page:'forecasts',records:{job:$event}})"
+      />
+    </div>
+    <section class="card density-context">
+      <h2>{{'Planning without a forecast'|t}}</h2>
+      <p>
+        {{'Reviewed assumptions and known schedules remain valid. Forecasting does not block
+        baseline planning.'|t}}
+      </p>
+      <button (click)="usePlanning.emit({})">{{'Financial Baseline'|t}}</button>
+    </section>
+  </div>
+  <details #forecastForm class="card density-editor" [open]="!!evidence() && !artifact()">
+    <summary>{{'Choose history, review and compose'|t}}</summary>
+
+    <p class="context-note">
+      {{'Forecasting is optional. Reviewed assumptions and known schedules remain valid planning
+      inputs.'|t}}
+    </p>
+    @if(artifact();as snapshot){
+    <dl class="status-summary">
+      <div>
+        <dt>{{'Selected model'|t}}</dt>
+        <dd>{{snapshot.result.selectedModel??('Not available'|t)}}</dd>
+      </div>
+      <div>
+        <dt>{{'Forecast status'|t}}</dt>
+        <dd>
+          {{(snapshot.result.status==='supported'?'Forecast available':'Assumptions needed')|t}}
+        </dd>
+      </div>
+      <div>
+        <dt>{{'Review status'|t}}</dt>
+        <dd>{{(snapshot.approval_id?'Forecast approved':'Review required')|t}}</dd>
+      </div>
+    </dl>
+    } @if(error()){
+    <p role="alert" class="error">{{ (error()) | t }}</p>
+    }@if(notice()){
+    <p role="status">{{ (notice()) | t }}</p>
+    } @if(workspace.kind==='demo'){
+    <p>{{ "Use a company workspace with confirmed historical data to run forecasts." | t }}</p>
+    }@else{
+    <fieldset [disabled]="busy()">
+      <legend>{{ "1 · Choose historical data" | t }}</legend>
+      <p>
+        {{ "Select confirmed versions with continuous, non-overlapping monthly Actuals. Known
+        schedules stay schedules." | t }}
+      </p>
+      @for(v of versions();track v.id){<label
+        ><input
+          type="checkbox"
+          [checked]="selected.has(v.id)"
+          (change)="select(v.id,$any($event.target).checked)"
+        />{{v.title}}</label
+      >}
+      <div class="forecast-grid">
+        <label>
+          {{ "Series" | t }}
+          <select [(ngModel)]="component" (ngModelChange)="changed()">
+            @for(s of series();track s){
+            <option [value]="s">{{s}}</option>
+            }
+          </select></label
+        ><label>
+          {{ "Forecast starts" | t }}
+          <input type="month" [(ngModel)]="origin" (ngModelChange)="changed()" /></label
+        ><label>
+          {{ "Planning horizon" | t }}
+          <select [(ngModel)]="horizon" (ngModelChange)="changed()">
+            <option [ngValue]="3">{{ "3 months" | t }}</option>
+            <option [ngValue]="6">{{ "6 months" | t }}</option>
+            <option [ngValue]="12">{{ "12 months" | t }}</option>
+          </select></label
+        >
+      </div>
+      <label
+        ><input type="checkbox" [(ngModel)]="scheduled" (ngModelChange)="changed()" /> {{ "Future
+        amounts are known or contractual" | t }} </label
+      ><label
+        ><input type="checkbox" [(ngModel)]="structural" (ngModelChange)="changed()" /> {{ "The
+        business has changed substantially since this history" | t }} </label
+      ><label
+        ><input type="checkbox" [(ngModel)]="reviewed" /> {{ "I reviewed that these are complete
+        monthly Actuals for the same series" | t }} </label
+      ><button (click)="check()" [disabled]="!reviewed||!component||!origin">
+        {{ "Check forecast eligibility" | t }}
+      </button>
+    </fieldset>
+    @if(evidence();as e){
+    <section>
+      <h2>{{ "2 · Evidence for {0} months" | t:[(e.history.horizon)] }}</h2>
+      <strong class="badge">{{ (e.eligibility.status.replaceAll('_',' ')) | t }}</strong>
+      <p>{{e.eligibility.reason|t}}</p>
+      <p>
+        {{ "{0} observations · {1} required by the evaluation policy" |
+        t:[(e.eligibility.observations),(e.eligibility.requiredObservations)] }}
+      </p>
+      @if(e.eligibility.status==='eligible'){<button
+        class="primary"
+        (click)="start()"
+        [disabled]="busy()"
+      >
+        {{ "Run model comparison" | t }}</button
+      >} @if(job();as j){
+      <p role="status">
+        {{ "Forecast job: {0}" | t:[(j.status|t)] }} @if(j.error_code){— {{j.error_code}}}
+      </p>
+      @if(j.status==='running'){
+      <p>{{ "If execution was interrupted, reopen this job and resume after 30 seconds." | t }}</p>
+      <button (click)="actionRetry(j.id)" [disabled]="busy()">
+        {{ "Resume interrupted job" | t }}</button
+      >}@if(j.status==='failed'||j.status==='queued'){<button
+        (click)="actionRetry(j.id)"
+        [disabled]="busy()"
+      >
+        {{ "Retry forecast job" | t }}</button
+      >}} @if(artifact();as a){
+      <h3>{{ (a.result.status==='supported'?'Forecast available':'Assumptions needed') | t }}</h3>
+      <p>{{ "Selected model: {0}" | t:[(a.result.selectedModel??'None')] }}</p>
+      <p>{{a.result.reason|t}}</p>
+      <p>{{a.result.uncertainty.reason|t}}</p>
+
+      <details>
+        <summary>{{ "How calculated? Models, validation and lineage" | t }}</summary>
+        <p>
+          {{ "MAE is the average absolute miss in your currency. RMSE gives more weight to large
+          misses. Lower is better. Each model is fitted only on data before its validation window."
+          | t }}
+        </p>
+        @for(c of a.result.candidates;track c.model){
+        <h4>{{c.model}} · {{(c.status|t)|t}}</h4>
+        <p>{{c.reason|t}}</p>
+        @if(c.metrics){
+        <p>{{ "MAE {0} · RMSE {1}" | t:[(c.metrics.mae),(c.metrics.rmse)] }}</p>
+        }}
+        <pre>{{a | json}}</pre>
+      </details>
+      @if(a.result.status==='supported'){
+      <p>{{ "Review these values and their limitations before approving." | t }}</p>
+      <button (click)="approve()" [disabled]="busy()||!!a.approval_id">
+        {{(a.approval_id?'Forecast approved':'Approve reviewed forecast')|t}}</button
+      >}}
+      <fieldset [disabled]="busy()">
+        <legend>{{ "3 · Create a new hybrid baseline" | t }}</legend>
+        <p>
+          {{ "Choose a confirmed future template with the same start month and horizon. Its opening
+          cash, schedules and other assumptions are retained." | t }}
+        </p>
+        <label>
+          {{ "Future planning template" | t }}
+          <select [(ngModel)]="templateId" (ngModelChange)="chooseTemplate()">
+            <option value="">{{ "Choose a version" | t }}</option>
+            @for(v of versions();track v.id){
+            <option [value]="v.id">{{v.title}}</option>
+            }
+          </select></label
+        >
+        <label>
+          {{ "Source for this component" | t }}
+          <select [(ngModel)]="mode" (ngModelChange)="sourceReview=false">
+            <option value="assumption">{{ "Explicit assumption" | t }}</option>
+            @if(artifact()?.approval_id){
+            <option value="forecast">{{ "Approved forecast" | t }}</option>
+            }
+          </select></label
+        >@if(mode==='assumption'){<label>
+          {{ "Monthly assumptions ({0} values, separated by commas)" | t:[(horizon)] }}
+          <textarea [(ngModel)]="values"></textarea></label
+        >} @if(template();as t){
+        <p>
+          {{ "{0} · {1} months. Replacing {2} entries for {3}. Existing cash timing is reused; a new
+          component uses same-month receipts/payments." |
+          t:[(t.projectionStart),(t.horizonMonths),(replace.length),(component)] }}
+        </p>
+        <details>
+          <summary>{{ "Review existing component sources" | t }}</summary>
+          @for(entry of t.entries;track entry.id){
+          <p>
+            {{entry.label}} · <span class="pill">{{(entry.source)|t}}</span> ·
+            {{entry.start}}–{{entry.end}} @if(replace.includes(entry.id)){ {{ "— will be replaced" |
+            t }} }
+          </p>
+          }
+        </details>
+        }
+        <label> {{ "Reason for these inputs" | t }} <textarea [(ngModel)]="note"></textarea></label
+        ><label
+          ><input type="checkbox" [(ngModel)]="sourceReview" /> {{ "I reviewed replacement entries,
+          cash timing and retained sources" | t }} </label
+        ><button
+          class="primary"
+          (click)="compose()"
+          [disabled]="!template()||!sourceReview||!note||(mode==='forecast'&&!artifact()?.approval_id)"
+        >
+          {{ "Create new hybrid baseline" | t }}
+        </button>
+      </fieldset>
+    </section>
+    } @if(composition();as c){
+    <section>
+      <h2>{{ "Hybrid baseline ready" | t }}</h2>
+      <p class="lineage">{{ "Baseline {0}" | t:[(c.baseline_version_id)] }}</p>
+      <button (click)="usePlanning.emit({baseline:composition()!.baseline_version_id})">
+        {{ "Open Data & baseline" | t }}
+      </button>
+      <details>
+        <summary>{{ "Source assignments and lineage" | t }}</summary>
+        @for(a of c.assignments;track $index){
+        <p class="lineage">
+          {{a.period}} · {{a.componentKey}} ·
+          <span class="pill">{{(a.source)|t}}</span>@if(a.artifactId){ {{ "· Forecast {0}" |
+          t:[(a.artifactId)] }} }@else{ {{ "· Planning version {0}" | t:[(a.planningVersionId??'New
+          reviewed assumption')] }} }
+        </p>
+        }
+      </details>
+    </section>
+    } }
+  </details>
+</div>

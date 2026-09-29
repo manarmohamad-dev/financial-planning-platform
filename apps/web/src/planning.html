@@ -1,0 +1,796 @@
+<workflow-stages
+  [labels]="['Planning inputs','Baseline versions','Results & evidence']"
+  [active]="result()?2:baselineId?1:0"
+/>
+<div class="page-heading">
+  <div>
+    <div class="eyebrow">{{ "BASELINE PLANNING" | t }}</div>
+    <h1>{{ "Financial Baseline" | t }}</h1>
+    <p class="muted">
+      {{ "Existing commitments and explicit assumptions, before proposed new decisions." | t }}
+    </p>
+  </div>
+  <span class="badge"> {{ "{0} · Monthly" | t:[(workspace.currency)] }} </span>
+</div>
+@if(workspace.kind!=='demo'){
+<nav class="workflow-contents" [attr.aria-label]="'On this page'|t">
+  <a inPage href="#baseline-inputs">{{"1. Company data"|t}}</a
+  ><a inPage href="#baseline-versions">{{"2. Baseline versions"|t}}</a
+  ><a inPage href="#baseline-results">{{"3. Results & calculation evidence"|t}}</a>
+</nav>
+} @if(error()){
+<div class="error" role="alert">{{ (error()) | t }}</div>
+} @if(notice()){
+<div class="notice" role="status">{{ (notice()) | t }}</div>
+}
+<div class="composition-grid baseline-desk">
+  <aside class="composition-rail">
+    <section class="card run-selector">
+      <span class="eyebrow">{{'Completed runs'|t}}</span>
+      <h2>{{'Baseline'|t}}</h2>
+      <label>
+        {{ "Completed runs" | t }}
+        <select [ngModel]="runId" (ngModelChange)="loadRun($event)">
+          <option value="">{{ "Select a completed run" | t }}</option>
+          @for(r of runs();track r.id){
+          <option [value]="r.id">{{r.title}} · {{r.id.slice(0,8)}}</option>
+          }
+        </select></label
+      >
+      <p class="muted">
+        {{'Existing commitments and explicit assumptions, before proposed new decisions.'|t}}
+      </p>
+    </section>
+    <record-history
+      [expanded]="true"
+      title="Saved drafts"
+      [records]="drafts()"
+      (openRecord)="navigate.emit({page:'planning',records:{draft:$event}})"
+    />
+    <record-history
+      [expanded]="true"
+      title="Completed runs"
+      [records]="runs()"
+      (openRecord)="navigate.emit({page:'planning',records:{run:$event}})"
+    />
+  </aside>
+  <div class="composition-primary">
+    @if(result();as summary){
+    <section class="baseline-summary" [attr.aria-label]="'Financial summary'|t">
+      <div class="summary-metrics">
+        <ui-metric
+          tone="capital"
+          icon="wallet"
+          label="Ending available cash"
+          [value]="summary.periods.at(-1)?.closingCash"
+          [currency]="summary.currency"
+          note="Last modeled month"
+        /><ui-metric
+          tone="reserve"
+          icon="shield"
+          label="Minimum projected cash"
+          [value]="summary.minimumCash?.amount"
+          [currency]="summary.currency"
+          [note]="summary.minimumCash?.period??'Not available'"
+        /><ui-metric
+          tone="performance"
+          icon="activity"
+          label="Operating result"
+          [value]="summary.periods.at(-1)?.operatingResult"
+          [currency]="summary.currency"
+          note="Last modeled month"
+        />
+      </div>
+      <div class="baseline-analysis">
+        <financial-chart [periods]="summary.periods" [currency]="summary.currency" />
+        <section class="baseline-watch">
+          <span class="eyebrow">{{'BASELINE LIQUIDITY'|t}}</span>
+          <h2>{{'Cash watch'|t}}</h2>
+          <div class="metric-grid">
+            <div>
+              <small> {{ "Minimum closing available cash" | t }} </small
+              ><strong>{{summary.minimumCash?.amount|money:workspace.currency}}</strong
+              ><small>{{summary.minimumCash?.period}}</small>
+            </div>
+            <div>
+              <small> {{ "First negative closing cash" | t }} </small
+              ><strong>{{(summary.firstNegativePeriod??'None / not calculated')|t}}</strong>
+            </div>
+            <div>
+              <small> {{ "First reserve breach" | t }} </small
+              ><strong
+                >{{(summary.reservePolicy?.minimum!==null&&summary.reservePolicy?'
+                '+(summary.firstReserveBreach??'None'):'No reserve policy')|t}}</strong
+              >
+            </div>
+            <div>
+              <small> {{ "Unfunded initial top-up gap" | t }} </small
+              ><strong>{{summary.fundingGap|money:workspace.currency}}</strong
+              ><small>
+                {{ "Under this baseline's reserve: {0}" | t:[(summary.reservePolicy?.minimum??('Not
+                declared'|t))] }}
+              </small>
+            </div>
+          </div>
+          <p class="muted">
+            {{ "All amounts in {0}. Funding gap = maximum of (reserve − closing available cash),
+            floored at zero. It is not financing approval or a lending recommendation." |
+            t:[(summary.currency)] }}
+          </p>
+        </section>
+      </div>
+    </section>
+    } @if(!result()){
+    <section class="card composition-empty">
+      <span class="eyebrow">{{'Financial summary'|t}}</span>
+      <h2>{{'Select a completed run'|t}}</h2>
+      <p>{{'No saved records yet. Complete the review steps above to create one.'|t}}</p>
+    </section>
+    }
+  </div>
+</div>
+@if(workspace.kind==='demo'){
+<section class="card">
+  <h2>{{ "Explore three synthetic businesses" | t }}</h2>
+  <p>
+    {{ "Each example uses explicit financial inputs. No forecast or real company data is involved."
+    | t }}
+  </p>
+  <label>
+    {{ "Financial profile" | t }}
+    <select [(ngModel)]="profile">
+      <option value="service">{{ "Service company — delayed collections and payroll" | t }}</option>
+      <option value="retail">{{ "Retail — cost of sales, purchases and fees" | t }}</option>
+      <option value="new-company">{{ "New company — assumptions and setup capex" | t }}</option>
+    </select></label
+  ><button class="primary" (click)="demo()" [disabled]="busy()">
+    {{ "Calculate synthetic baseline" | t }}
+  </button>
+</section>
+}@else{
+<details class="card workbench-editor" [open]="!result()">
+  <summary>{{'Edit and review'|t}}</summary>
+  <div class="section-heading">
+    <h2 id="baseline-inputs">{{ "1. Company data" | t }}</h2>
+    @if(can('data.edit')){<button
+      class="secondary"
+      (click)="navigate.emit({page:'planning'})"
+      [disabled]="busy()"
+    >
+      {{ "New draft" | t }}</button
+    >}
+  </div>
+  <label>
+    {{ "Saved drafts" | t }}
+    <select [ngModel]="draftId" (ngModelChange)="loadDraft($event)">
+      <option value="" disabled>{{ "Select a draft" | t }}</option>
+      @for(d of drafts();track d.id){
+      <option [value]="d.id">{{ "{0} · revision {1}" | t:[(d.title),(d.revision)] }}</option>
+      }
+    </select></label
+  >
+  <p class="muted">
+    {{ "Blank amounts remain unknown. Enter 0 only when zero is explicitly supported. Company-level
+    inputs only; one base currency." | t }}
+  </p>
+  <fieldset [disabled]="busy() || !can('baseline.edit')">
+    <div class="input-grid">
+      <label> {{ "Plan name" | t }} <input [(ngModel)]="document.title" maxlength="120" /></label
+      ><label>
+        {{ "Projection start" | t }}
+        <input type="month" [(ngModel)]="document.projectionStart" /><small>
+          {{ "Opening cash is the balance immediately before the first day of this month." | t }}
+        </small></label
+      ><label>
+        {{ "Horizon" | t }}
+        <select [(ngModel)]="document.horizonMonths">
+          <option [ngValue]="3">{{ "3 months" | t }}</option>
+          <option [ngValue]="6">{{ "6 months" | t }}</option>
+          <option [ngValue]="12">{{ "12 months" | t }}</option>
+        </select></label
+      >
+    </div>
+    <div class="inline-checks">
+      <label><input type="checkbox" [(ngModel)]="operating" /> {{ "Operating result" | t }} </label
+      ><label
+        ><input type="checkbox" [(ngModel)]="cash" /> {{ "Cash path and funding gap" | t }}
+      </label>
+    </div>
+    <details [open]="cash">
+      <summary>{{ "Opening cash — required only for cash analysis" | t }}</summary>
+      <div class="input-grid">
+        <label>
+          {{ "Available opening cash" | t }}
+          <input
+            inputmode="decimal"
+            [(ngModel)]="opening"
+            [attr.placeholder]='"Unknown" | t'
+          /><small>
+            {{ "Available to pay bills; excludes restricted funds. An explicit estimate is
+            permitted." | t }}
+          </small></label
+        ><label>
+          {{ "Restricted opening cash (optional)" | t }}
+          <input
+            inputmode="decimal"
+            [(ngModel)]="restricted"
+            [attr.placeholder]='"Not supplied" | t'
+          /><small>
+            {{ "Excluded from available cash unless an explicit release is entered." | t }}
+          </small></label
+        ><label>
+          {{ "Opening cash evidence" | t }}
+          <select [(ngModel)]="openingSource">
+            <option value="">{{ "Choose evidence" | t }}</option>
+            <option value="observed">{{ "Observed Data" | t }}</option>
+            <option value="assumption">{{ "Explicit Assumption" | t }}</option>
+          </select></label
+        ><label>
+          {{ "Opening cash source / reason" | t }}
+          <input
+            [(ngModel)]="openingNote"
+            [attr.placeholder]='"Balance source or reason for estimate" | t'
+        /></label>
+      </div>
+    </details>
+    <h3>{{ "Financial items" | t }}</h3>
+    <p class="muted">
+      {{ "Add recognized activity separately from cash schedules. A recurring amount applies once in
+      every month of its range. Existing obligations are cash schedules, not new expenses." | t }}
+    </p>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>{{ "Item" | t }}</th>
+            <th>{{ "Evidence" | t }}</th>
+            <th>{{ "Effect" | t }}</th>
+            <th>{{ "Months" | t }}</th>
+            <th>{{ "Actions" | t }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for(e of document.entries;track e.id){
+          <tr>
+            <td>{{e.label}}<small>{{e.componentKey}}</small></td>
+            <td><span class="badge">{{ (sourceText(e.source)) | t }}</span></td>
+            <td>{{ (text(e.effect)) | t }}</td>
+            <td>{{e.start}} → {{e.end}}</td>
+            <td>
+              <button class="text-button" (click)="editEntry(e)">{{ "Edit" | t }}</button>
+              <button class="text-button" (click)="removeEntry(e.id)">{{ "Remove" | t }}</button>
+            </td>
+          </tr>
+          }@empty{
+          <tr>
+            <td colspan="5">
+              {{ "No items yet. Add the material activity and cash movements for your chosen
+              outputs." | t }}
+            </td>
+          </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    <details class="item-editor" open>
+      <summary>{{ (entryId?'Edit item':'Add a financial item') | t }}</summary>
+      <div class="input-grid">
+        <label>
+          {{ "Item name" | t }}
+          <input [(ngModel)]="label" [attr.placeholder]='"Office rent" | t' /></label
+        ><label>
+          {{ "Component key" | t }}
+          <input [(ngModel)]="component" [attr.placeholder]='"office_rent" | t' /><small>
+            {{ "Stable identifier: lowercase letters, digits, _ or -. Use the same key for an
+            activity and its linked cash schedule." | t }}
+          </small></label
+        >
+        <label>
+          {{ "Financial category" | t }}
+          <select [(ngModel)]="category">
+            @for(c of categoryOptions;track c){
+            <option [value]="c">{{ (text(c)) | t }}</option>
+            }
+          </select></label
+        ><label>
+          {{ "Financial effect" | t }}
+          <select [(ngModel)]="effect">
+            @for(e of effectOptions;track e){
+            <option [value]="e">{{ (text(e)) | t }}</option>
+            }</select
+          ><small>
+            {{ "Revenue and expenses affect operating activity. Cash receipts/payments affect
+            available money. Interest and tax expense are non-operating." | t }}
+          </small></label
+        >
+        <label>
+          {{ "Evidence type" | t }}
+          <select [(ngModel)]="source">
+            <option value="">{{ "Choose evidence" | t }}</option>
+            <option value="observed">{{ "Observed Data" | t }}</option>
+            <option value="schedule">{{ "Known Schedule" | t }}</option>
+            <option value="assumption">{{ "Explicit Assumption" | t }}</option>
+          </select></label
+        ><label>
+          {{ "Source / assumption explanation" | t }}
+          <input
+            [(ngModel)]="note"
+            maxlength="500"
+            [attr.placeholder]='"Signed lease, supplied schedule, or estimate rationale" | t'
+        /></label>
+        <label> {{ "First month" | t }} <input type="month" [(ngModel)]="start" /></label
+        ><label> {{ "Last month" | t }} <input type="month" [(ngModel)]="end" /></label
+        ><label>
+          {{ "Exact event date (optional)" | t }} <input type="date" [(ngModel)]="date" /><small>
+            {{ "For a single-month event. Daily liquidity is not calculated." | t }}
+          </small></label
+        >
+        <label>
+          {{ "Amount behavior" | t }}
+          <select [(ngModel)]="driver">
+            <option value="fixed">{{ "Supplied amount per month" | t }}</option>
+            <option value="headcount">{{ "Payroll: headcount × loaded cost" | t }}</option>
+            <option value="revenue_linked">{{ "Cost: explicit proportion of revenue" | t }}</option>
+          </select></label
+        >
+        @if(driver==='fixed'){<label>
+          {{ "Amount per month ({0})" | t:[(workspace.currency)] }}
+          <input
+            inputmode="decimal"
+            [(ngModel)]="amount"
+            [attr.placeholder]='"Unknown" | t'
+          /><small>
+            {{ "Use nonnegative amounts; the financial effect determines direction." | t }}
+          </small></label
+        >} @if(driver==='headcount'){<label>
+          {{ "Existing headcount" | t }}
+          <input
+            inputmode="numeric"
+            [(ngModel)]="count"
+            [attr.placeholder]='"Unknown" | t' /></label
+        ><label>
+          {{ "Loaded monthly employee cost" | t }}
+          <input
+            inputmode="decimal"
+            [(ngModel)]="monthlyCost"
+            [attr.placeholder]='"Unknown" | t' /></label
+        ><label>
+          {{ "Total onboarding cost, first month (optional)" | t }}
+          <input
+            inputmode="decimal"
+            [(ngModel)]="onboarding"
+            [attr.placeholder]='"Not supplied" | t'
+          /><small>
+            {{ "An explicit total for existing committed onboarding, not a proposed hiring
+            decision." | t }}
+          </small></label
+        >} @if(driver==='revenue_linked'){<label>
+          {{ "Revenue component key" | t }}
+          <input [(ngModel)]="baseComponent" [attr.placeholder]='"sales" | t' /></label
+        ><label>
+          {{ "Proportion of that revenue" | t }}
+          <input
+            inputmode="decimal"
+            [(ngModel)]="rate"
+            [attr.placeholder]='"e.g. 0.02 for 2%" | t'
+          /><small>
+            {{ "Applied to the confirmed recognized revenue amount for each month." | t }}
+          </small></label
+        >}
+      </div>
+      @if(effect==='cash_receipt'||effect==='cash_payment'||effect==='restricted_release'){
+      <p class="muted">
+        {{ "This amount is an explicit cash event. No automatic timing is applied." | t }}
+      </p>
+      <div class="input-grid">
+        <label>
+          {{ "Settles recognized item (optional)" | t }}
+          <select [(ngModel)]="settlesId">
+            <option value="">{{ "Standalone cash event / opening obligation" | t }}</option>
+            @for(e of document.entries;track
+            e.id){@if(e.effect==='revenue'||e.effect==='revenue_reduction'||e.effect==='operating_expense'||e.effect==='non_operating_expense'){
+            <option [value]="e.id">{{e.label}} · {{e.componentKey}}</option>
+            }}
+          </select></label
+        >@if(settlesId){<label>
+          {{ "Original activity month" | t }}
+          <input type="month" [(ngModel)]="settlesPeriod" /><small>
+            {{ "The linked payments must account for the full activity amount, including beyond the
+            horizon." | t }}
+          </small></label
+        >}
+      </div>
+      }@else{
+      <label>
+        {{ "How does this activity become cash?" | t }}
+        <select [(ngModel)]="timing">
+          <option value="not_modeled">{{ "Not supplied — blocks cash calculation" | t }}</option>
+          <option value="profile">{{ "Explicit monthly timing proportions" | t }}</option>
+          <option value="explicit">{{ "Separate linked receipt/payment schedules" | t }}</option>
+          <option value="non_cash">{{ "Non-cash cost / COGS with separate purchases" | t }}</option>
+          <option value="included_in_net">
+            {{ "Fee already deducted in net settlements" | t }}
+          </option></select
+        ><small>
+          {{ "Revenue is not automatically collected in the same month. Costs are not automatically
+          paid immediately." | t }}
+        </small></label
+      >
+      @if(timing==='profile'){
+      <p>
+        {{ "Proportions must sum to 1. Offset 0 means the activity month; offset 1 means next
+        month." | t }}
+      </p>
+      @for(b of buckets;track $index){
+      <div class="input-grid">
+        <label>
+          {{ "Months after activity" | t }}
+          <input type="number" min="0" max="120" [(ngModel)]="b.offsetMonths" /></label
+        ><label>
+          {{ "Proportion" | t }}
+          <input
+            inputmode="decimal"
+            [(ngModel)]="b.proportion"
+            [attr.placeholder]='"e.g. 0.5" | t' /></label
+        ><button class="text-button" (click)="buckets.splice($index,1)">
+          {{ "Remove timing bucket" | t }}
+        </button>
+      </div>
+      }<button class="secondary" (click)="buckets.push({offsetMonths:0,proportion:''})">
+        {{ "Add timing bucket" | t }}</button
+      >}}
+      <div class="inline-checks">
+        <label
+          ><input type="checkbox" [(ngModel)]="committed" /> {{ "Existing commitment" | t }} </label
+        ><label
+          ><input type="checkbox" [(ngModel)]="openingObligation" /> {{ "Opening obligation (cash
+          schedule only)" | t }}
+        </label>
+      </div>
+      <div class="actions">
+        <button class="secondary" (click)="addEntry()">
+          {{ (entryId?'Update item':'Add item to draft') | t }}</button
+        ><button class="text-button" (click)="resetEntry()">{{ "Clear item form" | t }}</button>
+      </div>
+    </details>
+    <details open>
+      <summary>{{ "Coverage and financial conventions" | t }}</summary>
+      <p>
+        {{ "Confirm these only after reviewing completeness for the selected horizon. This
+        explicitly includes any months with zero activity; unchecked coverage blocks its output." |
+        t }}
+      </p>
+      <div class="inline-checks">
+        <label
+          ><input type="checkbox" [(ngModel)]="document.coverage.revenueComplete" /> {{ "Revenue
+          coverage reviewed" | t }} </label
+        ><label
+          ><input type="checkbox" [(ngModel)]="document.coverage.expensesComplete" /> {{ "Operating
+          cost coverage reviewed" | t }} </label
+        ><label
+          ><input type="checkbox" [(ngModel)]="document.coverage.cashComplete" /> {{ "Material cash
+          flows and opening obligations reviewed" | t }}
+        </label>
+      </div>
+      <div class="input-grid">
+        <label>
+          {{ "Depreciation" | t }}
+          <select [(ngModel)]="document.coverage.depreciation">
+            <option value="excluded">{{ "Excluded — no amount supplied" | t }}</option>
+            <option value="included">{{ "Included — explicit expense supplied" | t }}</option>
+            <option value="not_applicable">{{ "Confirmed not applicable" | t }}</option>
+          </select></label
+        ><label>
+          {{ "Recognized revenue" | t }}
+          <select [(ngModel)]="document.coverage.revenueConvention">
+            <option value="gross_with_refunds">
+              {{ "Gross; refunds separately supplied if relevant" | t }}
+            </option>
+            <option value="net_of_refunds">{{ "Already net of refunds" | t }}</option>
+          </select></label
+        ><label>
+          {{ "Sales receipt convention" | t }}
+          <select [(ngModel)]="document.coverage.settlementConvention">
+            <option value="gross">{{ "Gross receipts; fees paid separately" | t }}</option>
+            <option value="net">
+              {{ "Explicit net settlements; no duplicate fee payments" | t }}
+            </option>
+          </select></label
+        >
+      </div>
+    </details>
+    <div class="actions">
+      <button class="secondary" (click)="saveDraft()" [disabled]="!draftId&&!can('data.edit')">
+        {{ "Save draft" | t }}</button
+      ><button class="secondary" (click)="validate()">{{ "Check capabilities" | t }}</button
+      ><button class="primary" (click)="confirm()" [disabled]="!draftId&&!can('data.edit')">
+        {{ "Save & confirm planning version" | t }}
+      </button>
+    </div>
+    <p class="muted">
+      {{ "Confirmation records the supplied sources and assumptions. Managers can revise assumptions
+      after an Owner or Analyst confirms the raw data." | t }}
+    </p>
+  </fieldset>
+</details>
+@if(report();as r){
+<section class="card planning-section">
+  <h2>{{ "Capability report" | t }}</h2>
+  @for(c of r.capabilities;track c.capability){
+  <div class="capability">
+    <h3>{{(text(c.capability))|t}} · {{(stateText(c.readiness))|t}}</h3>
+    <p class="muted">{{ "Evidence: {0}" | t:[(c.evidence.join(', '))] }}</p>
+    @for(f of c.findings;track $index){
+    <div class="finding">
+      <strong>{{f.message|t}}</strong
+      ><small>
+        {{ "Required · Can be resolved with: {0} · {1}" | t:[(f.requirement.permittedSources.join(',
+        ')),(f.requirement.target)] }}
+      </small>
+    </div>
+    }
+  </div>
+  }
+</section>
+}
+<details class="card evidence-disclosure" [open]="!result()">
+  <summary id="baseline-versions">{{ "2. Baseline versions" | t }}</summary>
+  <p class="muted">
+    {{ "A prepared baseline freezes its planning version and the reserve policy in force. Draft
+    edits and later policies do not change it." | t }}
+  </p>
+  <div class="input-grid">
+    <label>
+      {{ "Confirmed planning version" | t }}
+      <select
+        [ngModel]="versionId"
+        data-record-picker
+        (ngModelChange)="navigate.emit({page:'planning',records:{version:$event}})"
+      >
+        <option value="">{{ "Select a version" | t }}</option>
+        @for(v of versions();track v.id){
+        <option [value]="v.id">{{v.title}} · {{v.id.slice(0,8)}}</option>
+        }
+      </select></label
+    ><button
+      class="secondary"
+      (click)="prepare()"
+      [disabled]="busy()||!versionId||!can('baseline.edit')"
+    >
+      {{ "Prepare baseline" | t }}
+    </button>
+  </div>
+  <div class="input-grid">
+    <label>
+      {{ "Baseline" | t }}
+      <select
+        [ngModel]="baselineId"
+        data-record-picker
+        (ngModelChange)="navigate.emit({page:'planning',records:{baseline:$event}})"
+      >
+        <option value="">{{ "Select a baseline" | t }}</option>
+        @for(b of baselines();track b.id){
+        <option [value]="b.id">
+          {{b.title}} · {{b.id.slice(0,8)}} · {{(b.published_at?'Published':'Prepared')|t}}
+        </option>
+        }
+      </select></label
+    >
+    <div class="actions">
+      <button
+        class="secondary"
+        (click)="publish()"
+        [disabled]="busy()||!baselineId||!can('baseline.publish')"
+      >
+        {{ "Publish shared baseline" | t }}</button
+      ><button
+        class="primary"
+        (click)="execute()"
+        [disabled]="busy()||!baselineId||!can('baseline.edit')"
+      >
+        {{ "Calculate baseline" | t }}
+      </button>
+    </div>
+  </div>
+  <small> {{ "Owners and Managers publish. Analysts may prepare and calculate." | t }} </small>
+</details>
+<details class="card evidence-disclosure" [open]="!result()">
+  <summary>{{ "Declared cash reserve" | t }}</summary>
+  <p>
+    {{ "Current workspace policy:" | t }}
+    <strong>{{(reserveCurrent()??'Not declared')|t}}</strong> {{ "{0}. Used for newly prepared
+    baselines." | t:[(workspace.currency)] }}
+  </p>
+  @if(can('risk.edit')){
+  <div class="input-grid">
+    <label>
+      {{ "Minimum cash reserve" | t }}
+      <input
+        inputmode="decimal"
+        [(ngModel)]="reserve"
+        [attr.placeholder]='"Blank explicitly unsets the policy" | t'
+      /><small>
+        {{ "No recommended reserve is inferred. Zero is a valid explicit policy." | t }}
+      </small></label
+    ><label> {{ "Policy reason" | t }} <input [(ngModel)]="reserveNote" maxlength="500" /></label>
+  </div>
+  <button class="secondary" (click)="saveReserve()" [disabled]="busy()||!reserveNote.trim()">
+    {{ "Save new reserve policy version" | t }}</button
+  >}
+</details>
+}
+<div class="density-page baseline-evidence">
+  <div class="density-lower">
+    <section class="card planning-section">
+      <h2 id="baseline-results">{{ "3. Results & calculation evidence" | t }}</h2>
+      @if(result();as r){
+      <dl class="density-stats">
+        <div>
+          <dt>{{'Monthly periods'|t}}</dt>
+          <dd>{{r.periods.length}}</dd>
+        </div>
+        <div>
+          <dt>{{'Evidence movements'|t}}</dt>
+          <dd>{{r.evidence.length}}</dd>
+        </div>
+        <div>
+          <dt>{{'Operating Result is not Net Profit.'|t}}</dt>
+          <dd>{{'Review limitations'|t}}</dd>
+        </div>
+      </dl>
+      <details class="evidence-disclosure">
+        <summary>
+          {{'Monthly financial statement'|t}}
+          <span>{{r.periods.length}} {{'Monthly periods'|t}}</span>
+        </summary>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>{{ "Month" | t }}</th>
+                <th>{{ "Revenue" | t }}</th>
+                <th>{{ "Operating costs" | t }}</th>
+                <th>{{ "Operating Result" | t }}</th>
+                <th>{{ "Opening cash" | t }}</th>
+                <th>{{ "Cash in" | t }}</th>
+                <th>{{ "Cash out" | t }}</th>
+                <th>{{ "Net cash movement" | t }}</th>
+                <th>{{ "Closing cash" | t }}</th>
+                <th>{{ "Restricted cash" | t }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for(p of r.periods;track p.period){
+              <tr>
+                <th>{{p.period}}</th>
+                <td>{{p.revenue | money}}</td>
+                <td>{{p.operatingExpenses | money}}</td>
+                <td>{{p.operatingResult | money}}</td>
+                <td>{{p.openingCash | money}}</td>
+                <td>{{p.cashInflows | money}}</td>
+                <td>{{p.cashOutflows | money}}</td>
+                <td>{{p.netCashMovement | money}}</td>
+                <td>{{p.closingCash | money}}</td>
+                <td>{{p.restrictedCash | money}}</td>
+              </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </details>
+      <details class="density-limitations">
+        <summary>{{"Assumptions and limitations"|t}}</summary>
+        <div class="finding">
+          <strong> {{ "Operating Result is not Net Profit." | t }} </strong>@for(l of
+          r.limitations;track l){
+          <p>{{l|t}}</p>
+          }
+        </div>
+      </details>
+      <p>
+        {{ "Known commitments within horizon: recognized costs {0}; cash payments {1}; cash receipts
+        {2}. These describe different financial effects and must not be added together." |
+        t:[(r.commitments.recognizedTotal),(r.commitments.cashPaymentsTotal),(r.commitments.cashReceiptsTotal)]
+        }}
+      </p>
+      <details>
+        <summary>
+          {{ "Beyond-horizon amounts ({0} movements)" | t:[(r.tailMovements.length)] }}
+        </summary>
+        @for(m of r.tailMovements;track m.id){
+        <p>{{m.period}} · {{m.label}} · {{(text(m.effect))|t}} · {{m.amount}}</p>
+        }@empty{
+        <p>{{ "No supplied or generated movements beyond this horizon." | t }}</p>
+        }
+      </details>
+      <details class="evidence-disclosure">
+        <summary>{{ "How was this calculated?" | t }}</summary>
+        <p>
+          {{ "Recognized revenue minus recognized operating expenses gives Operating Result. Opening
+          available cash plus receipts and releases minus payments gives closing available cash.
+          Each movement below links to its confirmed source." | t }}
+        </p>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>{{ "Month" | t }}</th>
+                <th>{{ "Component" | t }}</th>
+                <th>{{ "Effect" | t }}</th>
+                <th>{{ "Evidence" | t }}</th>
+                <th>{{ "Amount" | t }}</th>
+                <th>{{ "Lineage" | t }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for(m of r.evidence;track m.id){
+              <tr>
+                <td>{{m.period}}</td>
+                <td>{{m.label}}</td>
+                <td>{{ (text(m.effect)) | t }}</td>
+                <td>{{ (sourceText(m.source)) | t }}</td>
+                <td>{{m.amount}}</td>
+                <td>
+                  <button class="text-button" (click)="evidence.set(m)">
+                    {{ "Inspect source" | t }}
+                  </button>
+                </td>
+              </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        @if(evidence();as e){
+        <div class="evidence-panel">
+          <h3>{{e.label}}</h3>
+          <p>{{e.transformation}}</p>
+          <p>{{ "Source: {0} · {1}" | t:[(sourceText(e.source)),(e.note)] }}</p>
+          <p>
+            {{ "Activity: {0} · Result month: {1} · {2} {3}" |
+            t:[(e.activityPeriod),(e.period),(e.amount),(r.currency)] }}
+          </p>
+          <small>
+            {{ "Source version: {0}" | t:[(e.sourceVersionId)] }} <br />
+            {{ "Supplied by: {0}" | t:[(r.manifest.suppliedBy[e.entryId])] }} <br />
+            {{ "Confirmed by: {0} at {1}" | t:[(e.confirmedBy),(e.confirmedAt)] }} <br />
+            {{ "Movement: {0}" | t:[(e.id)] }} <br />
+            {{ "Parent items: {0}" | t:[(e.parentEntryIds.join(', ')||'Direct supplied amount')] }}
+          </small>
+        </div>
+        }
+        <details>
+          <summary>{{ "Opening cash evidence and immutable run manifest" | t }}</summary>
+          <pre>{{r.openingCashEvidence|json}}</pre>
+          <pre>{{r.manifest|json}}</pre>
+        </details>
+      </details>
+      <button class="secondary" (click)="replay()" [disabled]="busy()">
+        {{ "Verify deterministic replay" | t }}
+      </button>
+      }@else{
+      <p class="muted">
+        {{ "Calculate a baseline or select a completed run to inspect its financial path." | t }}
+      </p>
+      }
+    </section>
+
+    @if(baselineId){
+    <section class="card journey-actions">
+      <h2>{{'Next steps'|t}}</h2>
+      <p>
+        {{'Publish the selected baseline before creating a scenario. Forecasting remains
+        optional.'|t}}
+      </p>
+      <button (click)="navigate.emit({page:'decisions',records:{baseline:baselineId}})">
+        {{'Scenario Builder'|t}}</button
+      ><button (click)="navigate.emit({page:'forecasts',records:{version:versionId}})">
+        {{'Optional forecasting'|t}}</button
+      >@if(runId){<button
+        (click)="navigate.emit({page:'stress',records:{source:'baseline',run:runId}})"
+      >
+        {{'Risk Center'|t}}</button
+      >}
+    </section>
+    }
+  </div>
+</div>

@@ -1,0 +1,687 @@
+@if(!briefOnly){<workflow-stages
+  [labels]="['Source result','Declared constraints','Stress cases','Comparison','Decision Briefs']"
+  [active]="brief()?4:comparison()?3:batch()?2:source()?1:0"
+/>
+} @if(error()){
+<p role="alert" class="error">{{ (error()) | t }}</p>
+}@if(notice()){
+<p role="status">{{ (notice()) | t }}</p>
+} @if(briefOnly){
+<div class="page-heading">
+  <div>
+    <span class="eyebrow"> {{ "DECISION EVIDENCE" | t }} </span>
+    <h1>{{ "Decision Briefs" | t }}</h1>
+    <p class="muted">{{ "Your saved financial evidence, ready for review and sharing." | t }}</p>
+  </div>
+</div>
+} @if(!briefOnly){
+<div class="page-heading brief-controls">
+  <div>
+    <span class="eyebrow">{{'STRESS TESTING & DECISION EVIDENCE'|t}}</span>
+    <h1>{{'Risk Center & Stress Analysis'|t}}</h1>
+  </div>
+</div>
+} @if(briefOnly){
+<div class="density-page brief-density brief-controls">
+  <div class="density-grid">
+    <section class="card density-start">
+      <span class="eyebrow">{{'DECISION EVIDENCE'|t}}</span>
+      <h2>{{'Prepare a decision brief'|t}}</h2>
+      <p>
+        {{'A brief is generated from a saved risk comparison. Review the source and declared
+        constraints first.'|t}}
+      </p>
+      <dl class="density-stats">
+        <div>
+          <dt>{{'Saved risk comparisons'|t}}</dt>
+          <dd>{{savedComparisons().length}}</dd>
+        </div>
+        <div>
+          <dt>{{'Historical decision briefs'|t}}</dt>
+          <dd>{{briefs().length}}</dd>
+        </div>
+      </dl>
+      <button class="primary" (click)="navigate.emit({page:'stress',records:{}})">
+        {{'Review sources in Risk Center'|t}}
+      </button>
+    </section>
+    <section class="card density-preview">
+      <h2>{{'Selected brief'|t}}</h2>
+      @if(brief();as b){
+      <h3>{{b.document.title}}</h3>
+      <p>{{b.created_at|localDate}}</p>
+      <dl class="density-stats">
+        <div>
+          <dt>{{'Options in this brief'|t}}</dt>
+          <dd>{{b.document.options.length}}</dd>
+        </div>
+        <div>
+          <dt>{{'Declared constraints'|t}}</dt>
+          <dd>{{b.document.policy.rules.length}}</dd>
+        </div>
+      </dl>
+      <p>{{b.document.policy.title}}</p>
+      <p>
+        {{'Full financial evidence, assumptions and source references are retained in the brief
+        below.'|t}}
+      </p>
+      } @else{
+      <p class="density-note">
+        {{'No brief selected. Open a saved brief from the library, or review a risk comparison to
+        prepare one.'|t}}
+      </p>
+      <ul class="density-checklist">
+        <li>{{'Pinned source results'|t}}</li>
+        <li>{{'Declared constraints'|t}}</li>
+        <li>{{'Assumptions, limitations and traceable evidence'|t}}</li>
+      </ul>
+      }
+    </section>
+    <div>
+      <record-history
+        [expanded]="true"
+        title="Historical decision briefs"
+        [records]="briefs()"
+        (openRecord)="navigate.emit({page:'briefs',records:{brief:$event}})"
+      />
+    </div>
+    <section class="card density-wide">
+      <h2>{{'Comparisons available for review'|t}}</h2>
+      @for(c of savedComparisons();track c.id){
+      <div class="density-row">
+        <button (click)="navigate.emit({page:'stress',records:{comparison:c.id}})">
+          {{c.title}}</button
+        ><small>{{c.created_at|localDate}}</small>
+      </div>
+      }@empty{
+      <p>{{'No saved comparisons yet.'|t}}</p>
+      }
+    </section>
+    <section class="card">
+      <h2>{{'Assumptions and limitations'|t}}</h2>
+      <p>
+        {{'A brief reports calculated evidence under declared assumptions. It does not rank options
+        or decide for you.'|t}}
+      </p>
+    </section>
+  </div>
+</div>
+}@else{
+<div class="density-page risk-density brief-controls">
+  <div class="density-grid">
+    <section class="card density-start">
+      <h2>{{'Source result'|t}}</h2>
+      @if(workspace.kind==='demo'){
+      <p>{{'Use confirmed company data for custom stress analysis.'|t}}</p>
+      }@else{
+      <fieldset [disabled]="busy()">
+        <legend>{{ "1 · Choose a completed baseline or scenario" | t }}</legend>
+        <label>
+          {{ "Source result" | t }}
+          <select [(ngModel)]="sourceKey" (ngModelChange)="selectSource()">
+            <option value="">{{ "Choose a completed run" | t }}</option>
+            @for(s of sources();track s.kind+s.id){
+            <option [value]="s.kind+':'+s.id">
+              {{s.title}} · {{(s.kind|t)|t}} · {{s.id.slice(0,8)}}
+            </option>
+            }
+          </select></label
+        >
+        <p>
+          {{ "Baselines must be published. Scenario results already pin their confirmed baseline and
+          inputs." | t }}
+        </p>
+      </fieldset>
+      }
+      <p class="density-note">{{'Available completed sources'|t}}: {{sources().length}}</p>
+    </section>
+    <section class="card density-context">
+      <h2>{{'Declared constraints'|t}}</h2>
+      @if(workspace.kind!=='demo'){
+      <fieldset [disabled]="busy()">
+        <legend>{{ "2 · Declared financial constraints" | t }}</legend>
+        <label>
+          {{ "Risk policy version" | t }}
+          <select [(ngModel)]="policyId" (ngModelChange)="choosePolicy()">
+            <option value="">{{ "Select an explicit policy" | t }}</option>
+            @for(p of policies();track p.id){
+            <option [value]="p.id">{{ "{0} · v{1}" | t:[(p.title),(p.revision)] }}</option>
+            }
+          </select></label
+        >
+        @if(policy();as p){
+        <div class="density-policy-rules">
+          @for(r of p.rules;track r.id){
+          <div>
+            <span
+              >{{"{0} below"|t:[((r.metric==='closingCash'?'Closing cash':'Operating
+              result')|t)]}}</span
+            ><strong><bdi>{{r.threshold}} {{p.currency}}</bdi></strong
+            ><small>{{r.severity|t}}</small>
+          </div>
+          } @empty{
+          <p>{{'No rules are configured; constraint satisfaction cannot be assessed.'|t}}</p>
+          }
+        </div>
+        <details>
+          <summary>{{'Policy sources and version'|t}}</summary>
+          <p>
+            {{'Policy {0} · version {1}. Equality meets a minimum; only strictly lower values breach
+            it.'|t:[p.id,p.revision]}}
+          </p>
+          @for(r of p.rules;track r.id){
+          <p><bdi>{{r.id}}</bdi> · {{'Source: {0}'|t:[r.source]}}</p>
+          }
+        </details>
+        } @if(can('risk.edit')){
+        <details>
+          <summary>{{ "Create a new risk policy version" | t }}</summary>
+          <div class="stress-grid">
+            <label>
+              {{ "Minimum cash reserve" | t }}
+              <input [(ngModel)]="reserve" [attr.placeholder]='"Blank = not declared" | t' /></label
+            ><label>
+              {{ "Minimum operating result" | t }}
+              <input [(ngModel)]="operatingFloor" [attr.placeholder]='"Blank = not declared" | t'
+            /></label>
+          </div>
+          <label
+            ><input type="checkbox" [(ngModel)]="negativeCash" /> {{ "Flag projected cash below
+            zero" | t }} </label
+          ><label>
+            {{ "Policy source / reason" | t }}
+            <textarea [(ngModel)]="policySource"></textarea></label
+          ><label
+            ><input type="checkbox" [(ngModel)]="policyReviewed" /> {{ "I reviewed these thresholds
+            and their source" | t }} </label
+          ><button (click)="savePolicy()" [disabled]="!policyReviewed||!policySource">
+            {{ "Save new risk policy" | t }}
+          </button>
+        </details>
+        }@else{
+        <p>
+          {{ "Your role can use existing policies. Only an Owner with risk-policy permission can
+          change workspace thresholds." | t }}
+        </p>
+        }
+      </fieldset>
+      }@else{
+      <p>{{'Use confirmed company data for custom stress analysis.'|t}}</p>
+      }
+    </section>
+    <section class="card density-context">
+      <h2>{{'Stress-analysis context'|t}}</h2>
+      <dl class="density-stats">
+        <div>
+          <dt>{{'Saved risk comparisons'|t}}</dt>
+          <dd>{{savedComparisons().length}}</dd>
+        </div>
+        <div>
+          <dt>{{'Saved stress definitions'|t}}</dt>
+          <dd>{{definitions().length}}</dd>
+        </div>
+        <div>
+          <dt>{{'Historical decision briefs'|t}}</dt>
+          <dd>{{briefs().length}}</dd>
+        </div>
+      </dl>
+      <button
+        class="primary"
+        [disabled]="!source()"
+        (click)="riskEditor.open=true;riskEditor.scrollIntoView({block:'start'})"
+      >
+        {{'Review stress cases'|t}}
+      </button>
+    </section>
+    <section class="card density-preview density-wide">
+      <h2>{{'Comparison & risk timeline'|t}}</h2>
+      @if(comparison();as c){
+      <p class="muted">
+        {{"Trajectory preview: first two options. Full comparison evidence remains below."|t}}
+      </p>
+      <div class="comparison-charts">
+        @for(o of c.document.options.slice(0,2);track $index){<financial-chart
+          [periods]="o.financial.periods"
+          [scalePeriods]="comparisonChartPeriods()"
+          [currency]="o.financial.currency"
+          [title]="o.label"
+        />}
+      </div>
+      <p>
+        {{'Policy {0} · v{1}. Results show declared constraint satisfaction, not a
+        ranking.'|t:[c.document.policy.title,c.document.policy.revision]}}
+      </p>
+      }@else if(brief();as b){
+      <p class="muted">
+        {{"Trajectory preview: first two options. Full comparison evidence remains below."|t}}
+      </p>
+      <div class="comparison-charts">
+        @for(o of b.document.options.slice(0,2);track $index){<financial-chart
+          [periods]="o.periods"
+          [scalePeriods]="briefChartPeriods()"
+          [currency]="b.document.policy.currency"
+          [title]="o.label"
+        />}
+      </div>
+      <p>{{b.document.policy.title}}</p>
+      }@else if(source();as s){<financial-chart
+        [periods]="s.financial.periods"
+        [currency]="s.financial.currency"
+        title="Source result"
+      />} @else{
+      <p class="density-note">
+        {{'Stress comparison not calculated. Select a completed source, an explicit policy and
+        reviewed stress cases.'|t}}
+      </p>
+      <ul class="density-checklist">
+        <li>{{'Pinned source results'|t}}</li>
+        <li>{{'Declared constraints'|t}}</li>
+        <li>{{'Reviewed stress cases'|t}}</li>
+      </ul>
+      }
+    </section>
+    <div>
+      <record-history
+        [expanded]="true"
+        title="Saved risk comparisons"
+        [records]="savedComparisons()"
+        (openRecord)="navigate.emit({page:'stress',records:{comparison:$event}})"
+      />
+    </div>
+  </div>
+</div>
+} @if(comparison();as c){
+<section class="card brief-controls">
+  <h2>{{ "Comparison & risk timeline" | t }}</h2>
+  <p>
+    {{ "Policy {0} · v{1}. Results show declared constraint satisfaction, not a ranking." |
+    t:[(c.document.policy.title),(c.document.policy.revision)] }}
+  </p>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>{{ "Option" | t }}</th>
+          <th>{{ "Ending cash" | t }}</th>
+          <th>{{ "Minimum cash" | t }}</th>
+          <th>{{ "Rule / status" | t }}</th>
+          <th>{{ "First breach" | t }}</th>
+          <th>{{ "Breach months" | t }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for(o of c.document.options;track $index){@for(check of o.risk.checks;track check.ruleId){
+        <tr>
+          <th>{{o.label}}</th>
+          <td>{{o.financial.periods.at(-1)?.closingCash|money}}</td>
+          <td>{{o.financial.minimumCash?.amount|money}}</td>
+          <td>{{check.ruleId}} · {{(check.status|t)|t}}</td>
+          <td>{{(check.firstBreach??'None observed')|t}}</td>
+          <td>{{check.breachPeriods}}</td>
+        </tr>
+        }}
+      </tbody>
+    </table>
+  </div>
+  @for(o of c.document.options;track $index){
+  <h3>{{o.label}}</h3>
+  @if(!o.risk.findings.length){
+  <p>
+    {{ "No breach findings under the configured rules. Check unavailable metrics before interpreting
+    this result." | t }}
+  </p>
+  }@for(f of o.risk.findings;track f.id){
+  <article class="finding">
+    <strong>{{(f.severity|t)|t}} · {{f.firstPeriod}}–{{f.lastPeriod}}</strong>
+    <p>{{f.explanation|t}}</p>
+    <p>
+      {{ "{0} consecutive month(s). Recovery: {1}." |
+      t:[(f.durationMonths),(f.recoveryPeriod??(f.recovery==='unknown'?'Unknown':'Not observed
+      within horizon'))] }}
+    </p>
+    <button
+      (click)="evidence.set({finding:f,policy:c.document.policy,source:o.source.ref,run:o.ref,stress:o.definition})"
+    >
+      {{ "How was this finding calculated?" | t }}
+    </button>
+  </article>
+  }} @for(f of c.document.failures;track f.childId){
+  <p role="status">
+    {{ "Unresolved stress case {0}: {1} · {2}. No financial outcome is claimed." |
+    t:[(f.childId),(f.status|t),(f.error)] }}
+  </p>
+  }<button class="primary" (click)="prepareBrief()" [disabled]="busy()">
+    {{ "Generate deterministic decision brief" | t }}
+  </button>
+</section>
+}
+<details
+  #riskEditor
+  class="risk-editor brief-controls"
+  [open]="!!source() && !comparison() && !briefOnly"
+>
+  <summary>{{"Edit and review"|t}}</summary>
+  <section class="stress-workflow" [class.brief-only]="briefOnly">
+    <p class="eyebrow">{{ "STRESS TESTING & DECISION EVIDENCE" | t }}</p>
+    <h1>{{ "Risk Center & Stress Analysis" | t }}</h1>
+    <p>
+      {{ "Review explicit changes, trace threshold breaches and prepare a factual decision brief.
+      You remain responsible for the decision." | t }}
+    </p>
+    @if(workspace.kind==='demo'){
+    <p>{{ "Use confirmed company data for custom stress analysis." | t }}</p>
+    }@else{ @if(source();as s){
+    <fieldset [disabled]="busy()">
+      <legend>{{ "3 · Review a stress definition" | t }}</legend>
+      <p>
+        {{ "{0} · {1} · {2}–{3}. Every change references these pinned inputs; percentages never
+        compound on another stress." |
+        t:[(s.title),(s.financial.currency),(s.financial.periods[0].period),(endMonth())] }}
+      </p>
+      <div class="stress-grid">
+        <label>
+          {{ "Stress template" | t }}
+          <select [(ngModel)]="template">
+            <option value="revenue">{{ "Revenue decrease · 20%" | t }}</option>
+            <option value="expenses">{{ "Operating expense increase · 10%" | t }}</option>
+            <option value="delay">{{ "Collection delay · 1 month" | t }}</option>
+            <option value="combined">{{ "Combined adverse conditions" | t }}</option>
+            <option value="zero">{{ "Zero-stress reference" | t }}</option>
+            <option value="custom">{{ "Custom supported changes" | t }}</option>
+          </select></label
+        ><button (click)="applyTemplate()">{{ "Apply template for review" | t }}</button>
+      </div>
+      <p>
+        {{ "Templates target supported fixed entries only. Headcount, derived costs and explicit
+        settlement schedules are not overwritten. Review all selected items." | t }}
+      </p>
+      <label> {{ "Stress case name" | t }} <input [(ngModel)]="title" /></label> @for(m of
+      modifications;track m.id){
+      <div class="modification">
+        <h3>{{m.kind.replaceAll('_',' ')}} · {{label(m.targetEntryId)}}</h3>
+        <div class="stress-grid">
+          <label>
+            {{ "First month" | t }}
+            <input type="month" [(ngModel)]="m.start" (ngModelChange)="caseReviewed=false" /></label
+          ><label>
+            {{ "Last month" | t }}
+            <input type="month" [(ngModel)]="m.end" (ngModelChange)="caseReviewed=false" /></label
+          >@if(m.kind==='collection_delay'){<label>
+            {{ "Extra collection delay (months)" | t }}
+            <input
+              type="number"
+              min="0"
+              max="12"
+              [(ngModel)]="m.delayMonths"
+              (ngModelChange)="caseReviewed=false" /></label
+          >}@else{<label>
+            {{ "Proportional change (0.20 = 20%)" | t }}
+            <input [(ngModel)]="m.rate" (ngModelChange)="caseReviewed=false" /></label
+          >}
+        </div>
+        <label>
+          {{ "Stress assumption / reason" | t }}
+          <input [(ngModel)]="m.note" (ngModelChange)="caseReviewed=false" /></label
+        ><small>
+          {{ "Reference: pinned source · Dependencies: {0}" | t:[(m.dependencies.join(',
+          ')||'None')] }} </small
+        ><button (click)="modifications.splice($index,1);caseReviewed=false">
+          {{ "Remove modification" | t }}
+        </button>
+      </div>
+      }
+      <details>
+        <summary>{{ "Add a supported modification" | t }}</summary>
+        <label>
+          {{ "Change type" | t }}
+          <select [(ngModel)]="customKind">
+            <option value="revenue_decrease">{{ "Revenue decrease" | t }}</option>
+            <option value="expense_increase">{{ "Operating expense increase" | t }}</option>
+            <option value="collection_delay">{{ "Collection delay" | t }}</option>
+          </select></label
+        ><label>
+          {{ "Target financial item" | t }}
+          <select [(ngModel)]="targetId">
+            <option value="">{{ "Choose an item" | t }}</option>
+            @for(e of targets();track e.id){
+            <option [value]="e.id">{{label(e.id)}}</option>
+            }
+          </select></label
+        ><button (click)="add(customKind,targetId)" [disabled]="!targetId">
+          {{ "Add modification" | t }}
+        </button>
+      </details>
+      <label
+        ><input type="checkbox" [(ngModel)]="caseReviewed" /> {{ "I reviewed every target,
+        magnitude, period and source assumption" | t }} </label
+      ><button
+        class="primary"
+        (click)="saveCase()"
+        [disabled]="!caseReviewed||!title||modifications.length>24"
+      >
+        {{ "Confirm stress version" | t }}</button
+      >@if(parentId){
+      <p>{{ "Saving creates a new immutable version of {0}." | t:[(parentId)] }}</p>
+      }
+    </fieldset>
+    }
+    <fieldset [disabled]="busy()">
+      <legend>{{ "4 · Prepare and run a stress batch" | t }}</legend>
+      @for(d of definitions();track d.id){
+      <div class="case-row">
+        <label
+          ><input
+            type="checkbox"
+            [checked]="caseIds.has(d.id)"
+            (change)="toggleCase(d.id,$any($event.target).checked)"
+          />
+          {{ "{0} · v{1} · {2}" | t:[(d.title),(d.revision),(d.id.slice(0,8))] }} </label
+        ><button (click)="editCase(d.id)">{{ "Edit as new version" | t }}</button>
+      </div>
+      }
+      <p>{{ "Select up to eight versions against the same source run." | t }}</p>
+      <label> {{ "Batch / comparison title" | t }} <input [(ngModel)]="batchTitle" /></label
+      ><button
+        class="primary"
+        (click)="prepareBatch()"
+        [disabled]="!policyId||!caseIds.size||caseIds.size>8"
+      >
+        {{ "Prepare stress batch" | t }}
+      </button>
+    </fieldset>
+    @if(batch();as b){
+    <section class="card">
+      <h2>{{b.title}}</h2>
+      <p role="status">{{ "Batch status: {0}" | t:[(b.status|t)] }}</p>
+      <div class="actions">
+        <button
+          class="primary"
+          (click)="runBatch()"
+          [disabled]="busy()||b.status==='cancelled'||b.status==='completed'"
+        >
+          {{ "Run / retry pending cases" | t }}</button
+        ><button (click)="cancel()" [disabled]="b.status==='cancelled'||b.status==='completed'">
+          {{ "Cancel unfinished cases" | t }}</button
+        ><button (click)="openBatch(b.id)" [disabled]="busy()">
+          {{ "Refresh batch status" | t }}
+        </button>
+      </div>
+      <p>
+        {{ "Successful cases are retained. Failed cases can retry up to three attempts; interrupted
+        running cases can resume after 30 seconds." | t }}
+      </p>
+      @for(c of b.children;track c.id){
+      <div class="case-row">
+        <p>
+          {{ "{0} · {1} · attempt {2}" | t:[(c.document.title),(c.status|t),(c.attempt)] }}
+          @if(c.error_code){— {{c.error_code}}}
+        </p>
+        @if(c.result_id){<button (click)="inspectResult(c.result_id)">
+          {{ "Inspect stressed result" | t }}</button
+        >}<small>{{c.id}}</small>
+      </div>
+      }
+    </section>
+    }
+    <fieldset [disabled]="busy()">
+      <legend>{{ "5 · Compare compatible results" | t }}</legend>
+      <p>
+        {{ "Select settled batches sharing the same baseline, financial basis and risk policy.
+        Different scenarios A/B/C can be compared when those references agree." | t }}
+      </p>
+      @for(b of batches();track b.id){
+      <div class="case-row">
+        <label
+          ><input
+            type="checkbox"
+            [checked]="batchIds.has(b.id)"
+            (change)="toggleBatch(b.id,$any($event.target).checked)"
+          />{{b.title}} · {{b.id.slice(0,8)}}</label
+        ><button (click)="openBatch(b.id)">{{ "Open batch" | t }}</button>
+      </div>
+      }<button class="primary" (click)="compare()" [disabled]="!batchIds.size||batchIds.size>3">
+        {{ "Compare selected batches" | t }}
+      </button>
+    </fieldset>
+    @if(evidence()){
+    <details open class="card">
+      <summary>{{ "How calculated? Source, run, policy and evidence" | t }}</summary>
+      <pre>{{evidence() | json}}</pre>
+      <button (click)="evidence.set(null)">{{ "Close evidence" | t }}</button>
+    </details>
+    }
+    <details class="card brief-library" [open]="briefOnly">
+      <summary>{{ "Historical decision briefs" | t }}</summary>
+      @if(!briefs().length){
+      <p class="empty-state">
+        {{"No saved decision briefs yet. Create a comparison in Risk Center first."|t}}
+      </p>
+      } @for(b of briefs();track b.id){
+      <p>
+        <button (click)="navigate.emit({page:'briefs',records:{brief:b.id}})">
+          {{b.title}} · {{b.id.slice(0,8)}}
+        </button>
+      </p>
+      }
+    </details>
+    }
+  </section>
+</details>
+@if(brief();as b){
+<div class="brief-controls actions">
+  <button (click)="printPreview=!printPreview">
+    {{(printPreview?'Close print preview':'Preview print layout')|t}}</button
+  ><button (click)="print()">{{ "Print decision brief" | t }}</button
+  ><button (click)="replayBrief()">{{ "Verify historical brief" | t }}</button>
+</div>
+<article class="decision-brief" [class.print-preview]="printPreview">
+  <header>
+    <p>{{ "DETERMINISTIC DECISION BRIEF · {0}" | t:[(b.document.policy.currency)] }}</p>
+    <h1>{{b.document.title}}</h1>
+    <p>{{ "Prepared {0} · Brief {1}" | t:[(b.created_at|localDate),(b.id)] }}</p>
+    <p>
+      {{ "Baseline {0}" | t:[(b.document.baselineVersionId)] }} <br />
+      {{ "Comparison {0}" | t:[(b.document.comparisonId)] }}
+    </p>
+  </header>
+  <section>
+    <h2>{{ "Declared manager constraints" | t }}</h2>
+    <p>
+      {{ "{0} · version {1} · {2}" |
+      t:[(b.document.policy.title),(b.document.policy.revision),(b.document.policy.id)] }}
+    </p>
+    @for(r of b.document.policy.rules;track r.id){
+    <p>
+      {{ "{0} strictly below {1} {2} → {3}. Source: {4}" | t:[((r.metric==='closingCash'?'Closing
+      cash':'Operating
+      result')|t),(r.threshold),(b.document.policy.currency),(r.severity|t),(r.source)] }}
+    </p>
+    }
+  </section>
+  @for(o of b.document.options;track $index){
+  <section class="brief-option">
+    <h2>{{o.label}}</h2>
+    <p>
+      {{ "Calculated run: {0} / {1}" | t:[(o.ref.kind),(o.ref.id)] }} @if(o.ref.section){ /
+      {{o.ref.section}} }<br />
+      {{ "Source: {0} / {1}" | t:[(o.source.kind),(o.source.runId)] }}
+    </p>
+    <dl>
+      @for(m of o.metrics;track m.path){
+      <dt>{{m.label|t}}</dt>
+      <dd>
+        <bdi>{{m.value|money:b.document.policy.currency}}</bdi
+        ><small> {{ "Evidence: {0}" | t:[(m.path)] }} </small>
+      </dd>
+      }
+    </dl>
+    <h3>{{ "Monthly calculated evidence" | t }}</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>{{ "Month" | t }}</th>
+          <th>{{ "Operating result" | t }}</th>
+          <th>{{ "Closing cash" | t }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for(p of o.periods;track p.period){
+        <tr>
+          <th>{{p.period}}</th>
+          <td>{{p.operatingResult | money}}</td>
+          <td>{{p.closingCash | money}}</td>
+        </tr>
+        }
+      </tbody>
+    </table>
+    <h3>{{ "Stress assumptions and findings" | t }}</h3>
+    @if(o.stress){@for(m of o.stress.modifications;track m.id){
+    <p>
+      {{(m.kind==='revenue_decrease'?'Revenue decrease':m.kind==='expense_increase'?'Operating
+      expense increase':'Collection delay')|t}} · <bdi dir="ltr">{{m.start}}–{{m.end}}</bdi> ·
+      @if(m.rate!==null){ {{ "proportion {0}" | t:[(m.rate)] }} }@else{ {{ "extra delay {0} months"
+      | t:[(m.delayMonths)] }} }<br />
+      {{ "{0} · target {1}" | t:[(m.note),(m.targetEntryId)] }}
+    </p>
+    }}@else{
+    <p>{{ "Unstressed source result." | t }}</p>
+    }@for(f of o.risk.findings;track f.id){
+    <p>
+      {{ "{0} Recovery: {1}." | t:[(f.explanation|t),((f.recoveryPeriod??f.recovery)|t)] }} <br />
+      {{ "Rule {0} v{1} · finding {2}" | t:[(f.ruleId),(f.ruleVersion),(f.id)] }}
+    </p>
+    }@if(!o.risk.findings.length){
+    <p>{{ "No breach findings; unsupported measures remain unavailable." | t }}</p>
+    }
+    <h3>{{ "Source assumptions and limitations" | t }}</h3>
+    @for(a of o.assumptions;track $index){
+    <p>
+      {{a.component}} · {{(a.source)|t}}: {{a.note}}@if(a.forecastRef){<br />
+      {{ "Forecast evidence: {0}" | t:[(a.forecastRef | json)] }} }
+    </p>
+    }@for(l of o.limitations;track l){
+    <p>{{l|t}}</p>
+    }
+  </section>
+  }
+  <section class="brief-limitations">
+    <h2>{{ "Unresolved cases and limitations" | t }}</h2>
+    @for(f of b.document.failures;track f.childId){
+    <p>{{ "Case {0}: {1} / {2}." | t:[(f.childId),(f.status|t),(f.error)] }}</p>
+    }@for(l of b.document.limitations;track l){
+    <p>{{l|t}}</p>
+    }@for(l of b.document.unsupported;track l){
+    <p>{{l|t}}</p>
+    }
+    <p>
+      {{ "This brief provides traceable evidence. It does not select or recommend a decision." | t
+      }}
+    </p>
+  </section>
+</article>
+} @if(brief();as b){<button
+  class="brief-controls"
+  (click)="navigate.emit({page:'briefs',records:{brief:b.id}})"
+>
+  {{'Open this brief'|t}}</button
+>}

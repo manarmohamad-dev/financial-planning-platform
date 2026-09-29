@@ -1,0 +1,726 @@
+<workflow-stages
+  [labels]="['Upload','Preview','Mapping','Validation','Review','Confirmed dataset']"
+  [active]="datasetId?5:reviewed?4:report()?3:mapping?2:inspection()?1:0"
+/>
+<div class="page-heading">
+  <div>
+    <div class="eyebrow">{{ "FINANCIAL DATA IMPORT" | t }}</div>
+    <h1>{{ "Data & Imports" | t }}</h1>
+    <p>
+      {{ "Import values, choose their meaning, and confirm a traceable dataset. Suggestions never
+      confirm financial meaning." | t }}
+    </p>
+  </div>
+</div>
+@if(error()){
+<p role="alert" class="error">{{ (error()) | t }}</p>
+}@if(notice()){
+<p role="status" class="notice">{{ (notice()) | t }}</p>
+}@if(busy()){
+<p role="status">{{ "Working…" | t }}</p>
+}
+<div class="density-page import-density">
+  <div class="density-grid">
+    <div class="density-setup">
+      @if(workspace.kind==='demo'){
+      <section class="card planning-section">
+        <h2>{{ "Demo Mode · synthetic import preview" | t }}</h2>
+        <p>
+          {{ "Personal Demo does not accept financial uploads. This example shows how review works;
+          no company data is created." | t }}
+        </p>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>{{ "Source column" | t }}</th>
+                <th>{{ "Example" | t }}</th>
+                <th>{{ "Suggestion" | t }}</th>
+                <th>{{ "Required human clarification" | t }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>{{ "Month" | t }}</td>
+                <td>2026-01</td>
+                <td>{{ "Period (header alias)" | t }}</td>
+                <td>{{ "Confirm monthly coverage" | t }}</td>
+              </tr>
+              <tr>
+                <td>{{ "Sales" | t }}</td>
+                <td>10,000</td>
+                <td>{{ "Possible revenue" | t }}</td>
+                <td>{{ "Orders, recognized revenue or cash collected?" | t }}</td>
+              </tr>
+              <tr>
+                <td>{{ "Staff Cost" | t }}</td>
+                <td>3,000</td>
+                <td>{{ "Possible payroll" | t }}</td>
+                <td>{{ "Expense or payment? Actual or Budget?" | t }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          {{ "A real import requires an authorized Owner or Analyst in a company workspace. Existing
+          synthetic baseline/scenario examples remain available in Data and Decisions." | t }}
+        </p>
+      </section>
+      } @else { @if(can('data.import')){
+      <section class="card planning-section">
+        <h2>{{ "1. Upload Excel or CSV" | t }}</h2>
+        <p>
+          {{ "Values-only XLSX or UTF-8 CSV. Limits: 5 MiB; 10 sheets; 2,000 rows and 40 columns per
+          sheet; 80,000 cells overall. Formula cells, macros and external connections are rejected."
+          | t }}
+        </p>
+        <div class="input-grid">
+          <label>
+            {{ "Financial file" | t }}
+            <input type="file" accept=".xlsx,.csv" (change)="picked($event)" /></label
+          ><label>
+            {{ "CSV delimiter" | t }}
+            <select [(ngModel)]="delimiter">
+              <option value=",">{{ "Comma" | t }}</option>
+              <option value=";">{{ "Semicolon" | t }}</option>
+              <option value="tab">{{ "Tab" | t }}</option>
+            </select></label
+          >
+        </div>
+        <button class="primary" [disabled]="busy()||!file" (click)="upload()">
+          {{ "Upload for preview" | t }}
+        </button>
+      </section>
+      }@else{
+      <p>
+        {{ "You can inspect imported datasets and use them for planning. Your role cannot upload
+        files or confirm mappings." | t }}
+      </p>
+      } }
+    </div>
+    <section class="card density-context">
+      <span class="eyebrow">{{'Current workflow state'|t}}</span>
+      <h2>
+        {{(datasetId?'Confirmed
+        dataset':report()?'Validation':mapping?'Mapping':inspection()?'Preview':'Upload')|t}}
+      </h2>
+      <dl class="density-stats">
+        <div>
+          <dt>{{'Uploaded files'|t}}</dt>
+          <dd>{{files().length}}</dd>
+        </div>
+        <div>
+          <dt>{{'Confirmed datasets'|t}}</dt>
+          <dd>{{datasets().length}}</dd>
+        </div>
+      </dl>
+      <ul class="density-checklist">
+        <li>{{'Preview original source values'|t}}</li>
+        <li>{{'Review meaning, timing and mapping'|t}}</li>
+        <li>{{'Confirm only after validation and warning review'|t}}</li>
+      </ul>
+      <p>{{'Suggestions never confirm financial meaning.'|t}}</p>
+    </section>
+    <aside class="density-context">
+      <record-history
+        [expanded]="true"
+        title="Import history"
+        [records]="files()"
+        (openRecord)="navigate.emit({page:'imports',records:{file:$event}})"
+      /><record-history
+        [expanded]="true"
+        title="Confirmed datasets"
+        [records]="datasets()"
+        (openRecord)="navigate.emit({page:'imports',records:{dataset:$event}})"
+      />
+    </aside>
+  </div>
+  <div class="density-import-detail">
+    @if(workspace.kind!=='demo'){
+    <details
+      class="card workbench-history"
+      [open]="!!records.draft || !!records.run || !!records.dataset || !!records.file || !!records.comparison"
+    >
+      <summary>{{ "Import history" | t }}</summary>
+      <div class="input-grid">
+        <label>
+          {{ "Uploaded files" | t }}
+          <select
+            data-record-picker
+            #fileSelect
+            (change)="navigate.emit({page:'imports',records:{file:fileSelect.value}})"
+            [disabled]="busy()"
+          >
+            <option value="" selected disabled>{{ "Select an import" | t }}</option>
+            @for(f of files();track f.id){
+            <option [value]="f.id">
+              {{f.name}} · {{(f.cancelled?'cancelled':f.status)|t}} · {{f.id.slice(0,8)}}
+            </option>
+            }
+          </select></label
+        ><label>
+          {{ "Confirmed datasets" | t }}
+          <select
+            data-record-picker
+            #datasetSelect
+            (change)="navigate.emit({page:'imports',records:{dataset:datasetSelect.value}})"
+            [disabled]="busy()"
+          >
+            <option value="" selected disabled>{{ "Select a dataset" | t }}</option>
+            @for(d of datasets();track d.id){
+            <option [value]="d.id">{{d.title}} · {{d.id.slice(0,8)}}</option>
+            }
+          </select></label
+        >
+      </div>
+      @if(history()){
+      <h3>{{ "Immutable dataset, validation and source lineage" | t }}</h3>
+      <p>
+        {{ "Each normalized record traces to the original import, sheet, source row/column and
+        mapping version. Original Actual/Budget/Assumption labels remain visible." | t }}
+      </p>
+      <pre>{{history() | json}}</pre>
+      <button [disabled]="busy()" (click)="replay()">{{ "Verify dataset replay" | t }}</button
+      ><button (click)="usePlanning.emit({version:planningVersionId})">
+        {{ "Use existing baseline workflow" | t }}</button
+      >}
+    </details>
+    @if(info();as f){
+    <section class="card planning-section">
+      <h2>{{ "2. Structural preview" | t }}</h2>
+      <a
+        class="record-link"
+        [href]="'/api/v1/workspaces/'+workspace.id+'/imports/'+f.id+'/original'"
+        download
+        >{{'Download original file'|t}}</a
+      >
+      <p>{{ "{0} · uploaded {1} · {2}" | t:[(f.name),(f.uploaded_at|localDate),(f.status|t)] }}</p>
+      <details>
+        <summary>{{ "File provenance" | t }}</summary>
+        <p>
+          {{ "Import {0} · SHA-256 {1} · uploader {2}" | t:[(f.id),(f.file_hash),(f.uploaded_by)] }}
+        </p>
+      </details>
+      @if(f.sheets.length){
+      <div class="input-grid">
+        <label>
+          {{ "Sheet" | t }}
+          <select [(ngModel)]="sheet">
+            @for(s of f.sheets;track s.name){
+            <option [value]="s.name">
+              {{ "{0} ({1} rows × {2} columns)" | t:[(s.name),(s.rows),(s.columns)] }}
+            </option>
+            }
+          </select></label
+        ><label>
+          {{ "Header row" | t }} <input type="number" min="1" max="20" [(ngModel)]="headerRow"
+        /></label>
+      </div>
+      <div class="actions">
+        <button [disabled]="busy()" (click)="preview()">{{ "Preview selected sheet" | t }}</button
+        >@if(can('mapping.review')){<button [disabled]="busy()||f.cancelled" (click)="select()">
+          {{ "Start mapping this sheet" | t }}</button
+        >}
+      </div>
+      } @if(inspection();as i){@for(w of i.warnings;track $index){
+      <p class="finding">{{w}}</p>
+      }
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>{{ "Source row" | t }}</th>
+              @for(h of i.headers;track $index){
+              <th>
+                {{h||'(blank header)'}}<small>
+                  {{ "Column {0} · {1}" | t:[($index+1),(i.types[$index])] }}
+                </small>
+              </th>
+              }
+            </tr>
+          </thead>
+          <tbody>
+            @for(r of i.sample;track r.row){
+            <tr>
+              <th>{{r.row}}</th>
+              @for(v of r.values;track $index){
+              <td>{{v===''?'(blank)':v}}</td>
+              }
+            </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <p>
+        {{ "Values are displayed as text. This preview does not establish financial meaning or
+        completeness." | t }}
+      </p>
+      } @if(f.drafts.length){<label>
+        {{ "Saved mapping drafts" | t }}
+        <select
+          data-record-picker
+          #draftSelect
+          (change)="navigate.emit({page:'imports',records:{file:info()!.id,draft:draftSelect.value}})"
+        >
+          <option value="" disabled selected>{{ "Reopen draft" | t }}</option>
+          @for(d of f.drafts;track d.id){
+          <option [value]="d.id">
+            {{ "{0} · revision {1}" | t:[(d.mapping.title),(d.revision)] }}
+          </option>
+          }
+        </select></label
+      >} @if(can('data.import')){<button [disabled]="busy()||f.cancelled" (click)="cancel()">
+        {{ "Cancel this import" | t }}</button
+      >}
+    </section>
+    } @if(mapping;as m){
+    <section class="card planning-section">
+      <h2>{{ "3. Review mapping" | t }}</h2>
+      <p>
+        {{ "The suggestion explains a possible match. Select every column's role and confirm each
+        financial rule yourself." | t }}
+      </p>
+      <fieldset [disabled]="busy()||!can('mapping.review')" (change)="changed()">
+        <div class="input-grid">
+          <label> {{ "Dataset title" | t }} <input [(ngModel)]="m.title" /></label
+          ><label>
+            {{ "Projection start" | t }}
+            <input type="month" [(ngModel)]="m.projectionStart" /></label
+          ><label>
+            {{ "Horizon" | t }}
+            <select [(ngModel)]="m.horizonMonths">
+              <option [ngValue]="3">{{ "3 months" | t }}</option>
+              <option [ngValue]="6">{{ "6 months" | t }}</option>
+              <option [ngValue]="12">{{ "12 months" | t }}</option>
+            </select></label
+          ><label>
+            {{ "Number convention" | t }}
+            <select [(ngModel)]="m.numberLocale">
+              <option [ngValue]="null">{{ "Choose explicitly" | t }}</option>
+              <option value="decimal_dot">{{ "1,234.56 (decimal dot)" | t }}</option>
+              <option value="decimal_comma">{{ "1.234,56 (decimal comma)" | t }}</option>
+            </select></label
+          ><label>
+            {{ "Date convention" | t }}
+            <select [(ngModel)]="m.dateFormat">
+              <option [ngValue]="null">{{ "Choose explicitly" | t }}</option>
+              <option value="iso">{{ "YYYY-MM or YYYY-MM-DD" | t }}</option>
+              <option value="dmy">{{ "DD/MM/YYYY (also YYYY-MM)" | t }}</option>
+              <option value="mdy">{{ "MM/DD/YYYY (also YYYY-MM)" | t }}</option>
+              <option value="excel1900">{{ "Excel 1900 serial dates" | t }}</option>
+              <option value="excel1904">{{ "Excel 1904 serial dates" | t }}</option>
+            </select></label
+          ><label>
+            {{ "Requested outputs" | t }}
+            <select
+              [ngModel]="m.requestedOutputs.join(',')"
+              (ngModelChange)="m.requestedOutputs=$event.split(',')"
+            >
+              <option value="operating,cash">{{ "Operating and cash" | t }}</option>
+              <option value="operating">{{ "Operating only" | t }}</option>
+              <option value="cash">{{ "Cash only" | t }}</option>
+            </select></label
+          >
+        </div>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>{{ "Spreadsheet column / examples" | t }}</th>
+                <th>{{ "Suggested meaning / reason" | t }}</th>
+                <th>{{ "Your selection" | t }}</th>
+                <th>{{ "Status / exclusion reason" | t }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for(c of m.columns;track c.column){
+              <tr>
+                <td>
+                  {{inspection()?.headers?.[c.column]}}<small
+                    >{{inspection()?.sample?.[0]?.values?.[c.column]}} /
+                    {{inspection()?.sample?.[1]?.values?.[c.column]}}</small
+                  >
+                </td>
+                <td>
+                  {{suggestions()[c.column]?.role}} {{suggestions()[c.column]?.meaning}}<small
+                    >{{suggestions()[c.column]?.confidence}} ·
+                    {{suggestions()[c.column]?.reason}}</small
+                  >
+                </td>
+                <td>
+                  <label>
+                    {{ "Column {0} role" | t:[(c.column+1)] }}
+                    <select [(ngModel)]="c.role" (ngModelChange)="roleChanged(c.column)">
+                      @for(r of roles;track r){
+                      <option [value]="r">{{ (text(r)) | t }}</option>
+                      }
+                    </select></label
+                  >
+                </td>
+                <td>
+                  {{(c.role==='unreviewed'?'Needs review':'User
+                  selected')|t}}@if(c.role==='ignore'){<label>
+                    {{ "Column {0} exclusion reason" | t:[(c.column+1)] }}
+                    <input [(ngModel)]="c.reason" /></label
+                  >}
+                </td>
+              </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        @for(r of m.rules;track r.id;let ix=$index){
+        <fieldset class="item-editor">
+          <h3>{{ "Financial rule {0} · {1}" | t:[(ix+1),(inspection()?.headers?.[r.column])] }}</h3>
+          <p>
+            {{ "Sales may mean orders, recognized revenue or collected cash. Orders alone are
+            unsupported. Choose the actual financial effect; costs and cash payments are not
+            interchangeable." | t }}
+          </p>
+          <div class="input-grid">
+            <label>
+              {{ "Rule {0} component key" | t:[(ix+1)] }} <input [(ngModel)]="r.component" /><small>
+                {{ "Use a stable key for the same financial component to detect overlapping
+                sources." | t }}
+              </small></label
+            ><label>
+              {{ "Rule {0} category" | t:[(ix+1)] }}
+              <select [(ngModel)]="r.category">
+                @for(c of categories;track c){
+                <option [value]="c">{{ (text(c)) | t }}</option>
+                }
+              </select></label
+            ><label>
+              {{ "Rule {0} financial effect" | t:[(ix+1)] }}
+              <select [(ngModel)]="r.effect">
+                @for(e of effects;track e){
+                <option [value]="e">{{ (text(e)) | t }}</option>
+                }</select
+              ><small>
+                {{ "Recognition affects results; receipt/payment affects cash." | t }}
+              </small></label
+            ><label>
+              {{ "Rule {0} evidence basis" | t:[(ix+1)] }}
+              <select [(ngModel)]="r.basis">
+                <option [ngValue]="null">{{ "Choose or map a Basis column" | t }}</option>
+                <option value="actual">{{ "Actual" | t }}</option>
+                <option value="budget">{{ "Budget" | t }}</option>
+                <option value="forecast">{{ "Supplied Forecast (unsupported by M2)" | t }}</option>
+                <option value="assumption">{{ "Explicit assumption" | t }}</option>
+                <option value="schedule">{{ "Known schedule" | t }}</option>
+              </select></label
+            ><label>
+              {{ "Rule {0} financial behavior" | t:[(ix+1)] }}
+              <select [(ngModel)]="r.behavior">
+                <option value="monthly">{{ "One amount per month" | t }}</option>
+                <option value="dated_detail">
+                  {{ "Dated transaction details, summed monthly" | t }}
+                </option>
+                <option value="recurring">
+                  {{ "Recurring from Period through End period" | t }}
+                </option></select
+              ><small>
+                {{ "Category and behavior are separate. Do not combine detail and aggregate rows." |
+                t }}
+              </small></label
+            ><label>
+              {{ "Rule {0} sign convention" | t:[(ix+1)] }}
+              <select [(ngModel)]="r.sign">
+                <option [ngValue]="null">{{ "Choose explicitly" | t }}</option>
+                <option value="nonnegative">
+                  {{ "Nonnegative amounts; effect defines direction" | t }}
+                </option>
+                <option value="negative_outflow">
+                  {{ "Negative costs/payments, including parentheses" | t }}
+                </option>
+              </select></label
+            ><label>
+              {{ "Rule {0} cash timing" | t:[(ix+1)] }}
+              <select [(ngModel)]="r.timing">
+                <option value="unknown">{{ "Unknown — needs input for cash" | t }}</option>
+                <option value="same_month">
+                  {{ "Recognized amount collected/paid same month" | t }}
+                </option>
+                <option value="offset">{{ "Recognized amount collected/paid later" | t }}</option>
+                <option value="non_cash">
+                  {{ "Non-cash cost (supported categories only)" | t }}
+                </option>
+                <option value="direct_cash">
+                  {{ "Direct cash schedule: period is payment/receipt month" | t }}
+                </option>
+              </select></label
+            >@if(r.timing==='offset'){<label>
+              {{ "Rule {0} delay months" | t:[(ix+1)] }}
+              <input type="number" min="0" max="120" [(ngModel)]="r.offset" /></label
+            >}<label>
+              {{ "Rule {0} meaning and source explanation" | t:[(ix+1)] }}
+              <input [(ngModel)]="r.note" /><small>
+                {{ "Explain what the amount represents and why the selected basis and timing apply."
+                | t }}
+              </small></label
+            >
+          </div>
+          @if(r.filter){
+          <div class="input-grid">
+            <label>
+              {{ "Rule {0} filter column" | t:[(ix+1)] }}
+              <select [(ngModel)]="r.filter.column">
+                @for(h of inspection()?.headers;track $index){
+                <option [ngValue]="$index">{{$index+1}} · {{h}}</option>
+                }
+              </select></label
+            ><label>
+              {{ "Rule {0} exact row label" | t:[(ix+1)] }} <input [(ngModel)]="r.filter.value"
+            /></label>
+          </div>
+          <button (click)="r.filter=null">{{ "Remove row filter" | t }}</button>}@else{<button
+            (click)="addFilter(r)"
+          >
+            {{ "Filter rule {0} by row label" | t:[(ix+1)] }}</button
+          >}
+          <label class="check"
+            ><input type="checkbox" [(ngModel)]="r.semanticConfirmed" /> {{ "I confirm the financial
+            meaning of rule {0}." | t:[(ix+1)] }} </label
+          ><label class="check"
+            ><input type="checkbox" [(ngModel)]="r.approveBudgetAsAssumption" /> {{ "If this is
+            Budget, explicitly use it as a planning assumption, never as Actual." | t }} </label
+          ><label class="check"
+            ><input type="checkbox" [(ngModel)]="r.committed" /> {{ "Rule {0} represents a financial
+            commitment." | t:[(ix+1)] }} </label
+          ><label class="check"
+            ><input type="checkbox" [(ngModel)]="r.openingObligation" /> {{ "Rule {0} is an existing
+            opening cash obligation, not new recognized activity." | t:[(ix+1)] }} </label
+          ><button (click)="m.rules.splice(ix,1);changed()">
+            {{ "Remove rule {0}" | t:[(ix+1)] }}
+          </button>
+        </fieldset>
+        }
+        <div class="actions">
+          @for(c of m.columns;track c.column){@if(c.role==='amount'){<button
+            (click)="addRule(c.column)"
+          >
+            {{ "Add another rule for column {0}" | t:[(c.column+1)] }}</button
+          >}}
+        </div>
+        <h3>{{ "Coverage and row review" | t }}</h3>
+        <div class="input-grid">
+          <label>
+            {{ "Source coverage from" | t }}
+            <input type="date" [(ngModel)]="m.coverageFrom" /></label
+          ><label>
+            {{ "Source coverage through" | t }} <input type="date" [(ngModel)]="m.coverageTo"
+          /></label>
+        </div>
+        <p>
+          {{ "Partial boundary months require an explicit warning acknowledgement. Amounts are not
+          extrapolated and monthly totals do not establish within-month liquidity." | t }}
+        </p>
+        @for(f of inspection()?.flaggedRows;track $index){
+        <p class="finding">{{ "Source row {0}: {1}" | t:[(f.row),(f.reason)] }}</p>
+        }
+        <div class="input-grid">
+          <label>
+            {{ "Source row to exclude" | t }}
+            <input type="number" min="2" [(ngModel)]="excludeRow" /></label
+          ><label> {{ "Why exclude this row?" | t }} <input [(ngModel)]="excludeReason" /></label>
+        </div>
+        <button (click)="exclude()">{{ "Exclude row with reason" | t }}</button>@for(e of
+        m.excludedRows;track e.row){
+        <p>
+          {{ "Excluded row {0}: {1}" | t:[(e.row),(e.reason)] }}
+          <button (click)="m.excludedRows.splice($index,1);changed()">
+            {{ "Restore row {0}" | t:[(e.row)] }}
+          </button>
+        </p>
+        }
+        <label class="check"
+          ><input type="checkbox" [(ngModel)]="m.coverageReviewed" /> {{ "I reviewed source
+          coverage, exclusions and incomplete periods." | t }} </label
+        ><label class="check"
+          ><input type="checkbox" [(ngModel)]="m.currencyConfirmed" /> {{ "All included monetary
+          values use {0}; no FX conversion is required." | t:[(workspace.currency)] }} </label
+        ><label class="check"
+          ><input type="checkbox" [(ngModel)]="m.basisConfirmed" /> {{ "Actual, Budget, Forecast and
+          Assumption have been distinguished explicitly." | t }} </label
+        ><label class="check"
+          ><input type="checkbox" [(ngModel)]="m.scopeConfirmed" /> {{ "Included data describes the
+          company as a whole." | t }} </label
+        ><label class="check"
+          ><input type="checkbox" [(ngModel)]="m.coverage.revenueComplete" /> {{ "Revenue coverage
+          is reviewed, including explicit zero months." | t }} </label
+        ><label class="check"
+          ><input type="checkbox" [(ngModel)]="m.coverage.expensesComplete" /> {{ "All intended
+          operating costs are included." | t }} </label
+        ><label class="check"
+          ><input type="checkbox" [(ngModel)]="m.coverage.cashComplete" /> {{ "All intended cash
+          receipts/payments and existing obligations are included." | t }}
+        </label>
+        <div class="input-grid">
+          <label>
+            {{ "Depreciation coverage" | t }}
+            <select [(ngModel)]="m.coverage.depreciation">
+              <option value="excluded">{{ "Excluded — results before depreciation" | t }}</option>
+              <option value="included">{{ "Explicit depreciation included" | t }}</option>
+              <option value="not_applicable">{{ "Not applicable" | t }}</option>
+            </select></label
+          ><label>
+            {{ "Revenue basis" | t }}
+            <select [(ngModel)]="m.coverage.revenueConvention">
+              <option value="gross_with_refunds">
+                {{ "Gross revenue with separate refunds" | t }}
+              </option>
+              <option value="net_of_refunds">{{ "Revenue already net of refunds" | t }}</option>
+            </select></label
+          ><label>
+            {{ "Settlement basis" | t }}
+            <select [(ngModel)]="m.coverage.settlementConvention">
+              <option value="gross">{{ "Gross receipts and separate fees" | t }}</option>
+              <option value="net">{{ "Explicit net settlement receipts" | t }}</option>
+            </select></label
+          >
+        </div>
+        <h3>{{ "Opening cash" | t }}</h3>
+        <p>
+          {{ "Opening unrestricted cash is needed for cash projection. Map an opening-balance column
+          or supply one reviewed opening balance here. Do not import balances as period receipts." |
+          t }}
+        </p>
+        @if(!m.opening){<button (click)="addOpening()">
+          {{ "Supply opening cash manually" | t }}</button
+        >}@else{
+        <div class="input-grid">
+          <label>
+            {{ "Opening unrestricted cash" | t }} <input [(ngModel)]="m.opening.available" /></label
+          ><label>
+            {{ "Opening restricted cash (optional)" | t }}
+            <input [(ngModel)]="m.opening.restricted" /></label
+          ><label>
+            {{ "Opening balance source" | t }}
+            <select [(ngModel)]="m.opening.source">
+              <option value="observed">{{ "Observed" | t }}</option>
+              <option value="assumption">{{ "Explicit assumption" | t }}</option>
+            </select></label
+          ><label>
+            {{ "Opening balance explanation" | t }} <input [(ngModel)]="m.opening.note"
+          /></label>
+        </div>
+        <button (click)="m.opening=null;changed()">
+          {{ "Use imported opening balances only" | t }}</button
+        >}
+        <h3>{{ "Source selection" | t }}</h3>
+        <p>
+          {{ "This import creates a separate dataset. Existing manual/imported versions remain
+          unchanged. Select which sources belong here; there is no implicit merge or replacement." |
+          t }}
+        </p>
+        <label class="check"
+          ><input
+            type="checkbox"
+            [checked]="m.sourceResolution.mode==='new_dataset'"
+            (change)="m.sourceResolution.mode=$any($event.target).checked?'new_dataset':null"
+          />
+          {{ "Create a new standalone dataset using only this reviewed selection." | t }} </label
+        ><label>
+          {{ "Source selection explanation" | t }} <input [(ngModel)]="m.sourceResolution.note"
+        /></label>
+      </fieldset>
+      <div class="actions">
+        <button [disabled]="busy()||!can('mapping.review')" (click)="saveDraft()">
+          {{ "Save mapping draft" | t }}</button
+        ><button [disabled]="busy()||!can('mapping.review')" (click)="validate()">
+          {{ "Validate draft" | t }}
+        </button>
+      </div>
+      <label class="check"
+        ><input type="checkbox" [(ngModel)]="reviewed" /> {{ "I reviewed every column, financial
+        rule and exclusion and confirm this mapping." | t }} </label
+      ><button
+        class="primary"
+        [disabled]="busy()||!reviewed||!can('mapping.review')"
+        (click)="confirmMapping()"
+      >
+        {{ "Confirm mapping version" | t }}
+      </button>
+      <details>
+        <summary>{{ "Reuse a workspace mapping template" | t }}</summary>
+        <p>
+          {{ "Exact headers, column order and detected structural types must match. Applying a
+          template still requires fresh human confirmation and coverage review." | t }}
+        </p>
+        <label>
+          {{ "Mapping template" | t }}
+          <select [(ngModel)]="templateId">
+            <option value="">{{ "Select a template" | t }}</option>
+            @for(t of templates();track t.id){
+            <option [value]="t.id">{{ "{0} · v{1}" | t:[(t.name),(t.version)] }}</option>
+            }
+          </select></label
+        ><button [disabled]="busy()||!templateId||!can('mapping.review')" (click)="applyTemplate()">
+          {{ "Propose template mapping" | t }}
+        </button>
+      </details>
+    </section>
+    } @if(report();as r){
+    <section class="card planning-section">
+      <h2>{{ "4. Validation and capabilities" | t }}</h2>
+      @for(level of ['blocker','warning','information'];track level){
+      <h3>{{ "{0}s" | t:[(text(level))] }}</h3>
+      @for(issue of r.issues;track $index){@if(issue.severity===level){
+      <p class="finding">
+        <strong>{{issue.code}}</strong> {{issue.message|t}} @if(issue.row){<small>
+          {{ "Source row {0}" | t:[(issue.row)] }} </small
+        >}
+      </p>
+      }}}
+      <h3>{{ "Capability report" | t }}</h3>
+      <p>
+        {{ "Execution: {0}. Evidence quality: {1}." | t:[(r.canConfirm?'Ready to confirm after
+        warnings are reviewed':'Needs input'),(r.evidenceQuality)] }}
+      </p>
+      @for(c of r.capabilities?.capabilities;track c.capability){
+      <p><strong>{{ (text(c.capability)) | t }}</strong> {{ (text(c.readiness)) | t }}</p>
+      }@for(c of r.scenarioCapabilities;track c.name){
+      <p><strong>{{c.name}}:</strong> {{(text(c.readiness))|t}} — {{c.reason|t}}</p>
+      }
+      <details>
+        <summary>{{ "Normalized financial inputs and source rows" | t }}</summary>
+        <pre>{{r.document | json}}</pre>
+        <pre>{{r.lineage | json}}</pre>
+      </details>
+      @for(code of warnings();track code){<label class="check"
+        ><input
+          type="checkbox"
+          [checked]="accepted.includes(code)"
+          (change)="accept(code,$any($event.target).checked)"
+        />
+        {{ "I reviewed and accept warning {0} for this dataset." | t:[(code)] }} </label
+      >}
+      <button
+        class="primary"
+        [disabled]="busy()||!mappingVersionId||!r.canConfirm||accepted.length<warnings().length||!can('dataset.confirm')"
+        (click)="confirm()"
+      >
+        {{ "Confirm immutable dataset" | t }}</button
+      >@if(!mappingVersionId){
+      <p>{{ "Confirm a reviewed mapping version before confirming a dataset." | t }}</p>
+      }
+    </section>
+    } @if(planningVersionId){
+    <section class="card planning-section">
+      <h2>{{ "Dataset ready for the existing engines" | t }}</h2>
+      <p>
+        {{ "Planning version {0}. Open Data &amp; baseline, choose this confirmed version and
+        prepare/publish its baseline. Decisions then use that exact published baseline." |
+        t:[(planningVersionId)] }}
+      </p>
+      <button class="primary" (click)="usePlanning.emit({version:planningVersionId})">
+        {{ "Open baseline workflow" | t }}</button
+      >@if(can('mapping.review')){<label>
+        {{ "Template name" | t }} <input [(ngModel)]="templateName" /></label
+      ><button [disabled]="busy()||!templateName||!mappingVersionId" (click)="template()">
+        {{ "Save confirmed mapping template" | t }}</button
+      >}
+    </section>
+    } }
+  </div>
+</div>

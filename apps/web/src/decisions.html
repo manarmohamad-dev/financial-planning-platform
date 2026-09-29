@@ -1,0 +1,889 @@
+<workflow-stages
+  [labels]="['Decision setup','Review assumptions','Calculated result','Comparison']"
+  [active]="comparison()?3:result()?2:versionId?1:0"
+/>
+<div class="page-heading">
+  <div>
+    <div class="eyebrow">{{ "DECISION WORKSPACE" | t }}</div>
+    <h1>{{ "Scenario Builder" | t }}</h1>
+    <p class="muted">
+      {{ "Review explicit changes against a published baseline. All amounts are in {0}." |
+      t:[(workspace.currency)] }}
+    </p>
+  </div>
+</div>
+@if(result();as summary){
+<section class="summary-metrics" [attr.aria-label]="'Decision impact'|t">
+  <ui-metric
+    label="Scenario minimum cash"
+    [value]="summary.comparison.minimumCash.scenario"
+    [currency]="summary.manifest.currency"
+    note="Across the modeled horizon"
+  />
+  <ui-metric
+    label="Change in minimum cash"
+    [value]="summary.comparison.minimumCash.difference"
+    [currency]="summary.manifest.currency"
+    note="Scenario minus baseline"
+  />
+  <ui-metric
+    label="Scenario funding gap"
+    [value]="summary.comparison.fundingGap.scenario"
+    [currency]="summary.manifest.currency"
+    note="Analytical requirement, not added financing"
+  />
+</section>
+}
+<div class="density-page scenario-density">
+  <div class="density-grid" [class.density-populated]="!!result()">
+    <div class="density-setup">
+      @if(workspace.kind==='demo'){
+      <section class="card planning-section">
+        <h2>{{ "Demo Mode · synthetic decisions" | t }}</h2>
+        <p>
+          {{ "These preconfigured examples run the real scenario and financial engines in your
+          isolated demo workspace." | t }}
+        </p>
+        <label>
+          {{ "Example" | t }}
+          <select [(ngModel)]="demoType">
+            @for(t of types;track t){
+            <option [value]="t">{{ (text(t)) | t }}</option>
+            }
+          </select></label
+        ><button class="primary" [disabled]="busy()" (click)="demo()">
+          {{ "Run synthetic example" | t }}
+        </button>
+      </section>
+      }@else{
+      <section class="card planning-section">
+        <div class="section-heading">
+          <h2 id="scenario-baseline">{{ "1. Choose your baseline" | t }}</h2>
+          <button
+            [disabled]="busy()"
+            (click)="navigate.emit({page:'decisions',records:{baseline:document.baselineVersionId}})"
+          >
+            {{ "New decision" | t }}
+          </button>
+        </div>
+        <label>
+          {{ "Published baseline" | t }}
+          <select
+            [ngModel]="document.baselineVersionId"
+            data-record-picker
+            (ngModelChange)="navigate.emit({page:'decisions',records:{baseline:$event}})"
+            [disabled]="busy()"
+          >
+            <option value="">{{ "Select a published baseline" | t }}</option>
+            @for(b of baselines();track b.id){
+            <option [value]="b.id">{{b.title}} · {{b.id.slice(0,8)}}</option>
+            }
+          </select></label
+        >
+        @if(!baselines().length){
+        <p>{{ "Publish a baseline in Data & baseline before evaluating a decision." | t }}</p>
+        } @if(baseline();as b){
+        <p class="muted">
+          {{ "Pinned baseline {0} · {1} · {2} months · company-wide scope" |
+          t:[(b.baselineVersionId),(b.document.projectionStart),(b.document.horizonMonths)] }}
+        </p>
+        <details>
+          <summary>{{ "Baseline inputs and evidence sources" | t }}</summary>
+          <p>
+            {{ "Baseline values retain their original sources; baseline assumptions are not
+            relabeled as observed data." | t }}
+          </p>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>{{ "Item" | t }}</th>
+                  <th>{{ "Category" | t }}</th>
+                  <th>{{ "Source" | t }}</th>
+                  <th>{{ "Period" | t }}</th>
+                  <th>{{ "Driver / timing" | t }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for(e of b.document.entries;track e.id){
+                <tr>
+                  <td>{{e.label}}</td>
+                  <td>{{ (text(e.category)) | t }}</td>
+                  <td>{{ (text(e.source)) | t }}<small>{{e.note}}</small></td>
+                  <td>{{e.start}} → {{e.end}}</td>
+                  <td>{{e.driver | json}}<small>{{e.cashTreatment | json}}</small></td>
+                </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          <pre>{{b | json}}</pre>
+        </details>
+        } @if(result();as saved){
+        <div class="density-note">
+          <strong>{{'Saved calculation context'|t}}</strong>
+          <p>
+            <bdi>{{saved.manifest.currency}}</bdi> · {{saved.baseline.periods.length}} {{'Monthly
+            periods'|t}}
+          </p>
+          <p>
+            {{'The comparison uses the saved run inputs. The selector above starts a new
+            decision.'|t}}
+          </p>
+          <details>
+            <summary>{{'Baseline inputs and evidence sources'|t}}</summary>
+            <bdi>{{saved.manifest.baselineVersionId}}</bdi>
+          </details>
+        </div>
+        }
+      </section>
+      }
+    </div>
+    <section class="card density-preview">
+      <h2>{{'Baseline vs scenario'|t}}</h2>
+      @if(result();as r){
+      <div class="comparison-charts">
+        <financial-chart
+          [periods]="r.baseline.periods"
+          [scalePeriods]="r.baseline.periods.concat(r.scenario.periods)"
+          [currency]="r.manifest.currency"
+          title="Baseline"
+        /><financial-chart
+          [periods]="r.scenario.periods"
+          [scalePeriods]="r.baseline.periods.concat(r.scenario.periods)"
+          [currency]="r.manifest.currency"
+          title="Scenario"
+        />
+      </div>
+      } @if(!result()){
+      <h3>{{'Start a decision'|t}}</h3>
+      @if(baseline();as b){
+      <dl class="density-stats">
+        <div>
+          <dt>{{'Planning horizon'|t}}</dt>
+          <dd>{{b.document.horizonMonths}} {{'Monthly periods'|t}}</dd>
+        </div>
+        <div>
+          <dt>{{'Financial entries'|t}}</dt>
+          <dd>{{b.document.entries.length}}</dd>
+        </div>
+      </dl>
+      <p><bdi>{{b.document.projectionStart}}</bdi> · <bdi>{{workspace.currency}}</bdi></p>
+      <p>
+        {{'Choose a decision, review its assumptions, then calculate to compare with this pinned
+        baseline.'|t}}
+      </p>
+      } @else{
+      <p>
+        {{'Choose an available published baseline in the setup panel. If none exists, prepare and
+        publish one first.'|t}}
+      </p>
+      }
+      <button (click)="navigate.emit({page:'planning',records:{}})">
+        {{'Financial Baseline'|t}}</button
+      >}
+    </section>
+    <aside class="density-context card">
+      <h2>{{'Saved work and evidence'|t}}</h2>
+      <dl class="density-stats">
+        <div>
+          <dt>{{'Historical runs'|t}}</dt>
+          <dd>{{runs().length}}</dd>
+        </div>
+        <div>
+          <dt>{{'Saved comparisons'|t}}</dt>
+          <dd>{{comparisons().length}}</dd>
+        </div>
+      </dl>
+      <p>
+        {{'Saved results retain their reviewed inputs. Open a run to inspect its comparison and
+        evidence.'|t}}
+      </p>
+    </aside>
+    <div class="density-wide">
+      <record-history
+        [expanded]="true"
+        title="Historical runs"
+        [records]="runs()"
+        (openRecord)="navigate.emit({page:'decisions',records:{run:$event}})"
+      />
+    </div>
+    <div>
+      <record-history
+        [expanded]="true"
+        title="Saved comparisons"
+        [records]="comparisons()"
+        (openRecord)="navigate.emit({page:'decisions',records:{comparison:$event}})"
+      />
+    </div>
+  </div>
+</div>
+@if(workspace.kind!=='demo'){
+<nav class="workflow-contents" [attr.aria-label]="'On this page'|t">
+  <a inPage href="#scenario-baseline">{{"1. Choose your baseline"|t}}</a
+  ><a inPage href="#scenario-decision">{{"2. Describe your decision"|t}}</a
+  ><a inPage href="#scenario-review">{{"3. Review changes and confirm assumptions"|t}}</a>
+</nav>
+} @if(error()){
+<p class="error" role="alert">{{ (error()) | t }}</p>
+} @if(notice()){
+<p class="notice" role="status">{{ (notice()) | t }}</p>
+} @if(busy()){
+<p role="status">{{ "Working…" | t }}</p>
+} @if(workspace.kind!=='demo'){ @if(baseline()){
+<details class="card workbench-editor" [open]="!result()">
+  <summary>{{'Edit and review'|t}}</summary>
+  <h2 id="scenario-decision">{{ "2. Describe your decision" | t }}</h2>
+  <fieldset [disabled]="busy() || !can('scenario.edit')" (change)="changed()">
+    <div class="input-grid">
+      <label>
+        {{ "Decision name" | t }}
+        <input
+          [(ngModel)]="document.title"
+          [attr.placeholder]='"Hire two employees from October" | t' /></label
+      ><label>
+        {{ "Decision type" | t }}
+        <select [(ngModel)]="document.type" (ngModelChange)="typeChanged()">
+          @for(t of types;track t){
+          <option [value]="t">{{ (text(t)) | t }}</option>
+          }
+        </select></label
+      >
+    </div>
+    <fieldset class="item-editor">
+      <h3>{{(editId?'Edit change':'Add a change')|t}}</h3>
+      <p>
+        {{ "Each change is an explicit input. Costs do not generate revenue automatically. Use the
+        same component key for the same financial effect so overlaps can be detected." | t }}
+      </p>
+      <div class="input-grid">
+        @if(document.type==='combined'){<label>
+          {{ "Change type" | t }}
+          <select [(ngModel)]="decision" (ngModelChange)="decisionChanged()">
+            <option value="sales">{{ "Sales" | t }}</option>
+            <option value="hiring">{{ "Hiring" | t }}</option>
+            <option value="spending">{{ "Spending" | t }}</option>
+            <option value="expansion">{{ "Expansion" | t }}</option>
+          </select></label
+        >}
+        <label>
+          {{ "Change name" | t }}
+          <input [(ngModel)]="label" [attr.placeholder]='"Additional marketing" | t'
+        /></label>
+        @if(decision==='sales'||decision==='spending'){<label>
+          {{ "Change behavior" | t }}
+          <select [(ngModel)]="mode">
+            <option value="adjust">{{ "Adjust baseline item" | t }}</option>
+            <option value="entry">{{ "Add new item" | t }}</option>
+          </select></label
+        >}
+        <label>
+          {{ "Start month" | t }} <input type="month" [(ngModel)]="start" /><small>
+            {{ "First month of financial activity." | t }}
+          </small></label
+        ><label>
+          {{ "End month" | t }} <input type="month" [(ngModel)]="end" /><small>
+            {{ "Use the same month for a one-time item; otherwise the amount repeats monthly." | t
+            }}
+          </small></label
+        >
+        @if(mode==='adjust'){
+        <label>
+          {{ "Baseline item" | t }}
+          <select [(ngModel)]="target">
+            <option value="">{{ "Select item" | t }}</option>
+            @for(e of targets();track e.id){
+            <option [value]="e.id">
+              {{ "{0} · {1} to {2} · {3}" | t:[(e.label),(e.start),(e.end),(e.componentKey)] }}
+            </option>
+            }
+          </select></label
+        >
+        <label>
+          {{ "Operation" | t }}
+          <select [(ngModel)]="operation">
+            <option value="percentage_increase">{{ "Increase by rate" | t }}</option>
+            <option value="percentage_decrease">{{ "Decrease by rate" | t }}</option>
+            <option value="add">{{ "Increase by amount" | t }}</option>
+            <option value="subtract">{{ "Reduce by amount" | t }}</option>
+            <option value="set">{{ "Set monthly amount" | t }}</option>
+            <option value="remove">{{ "Remove during selected months" | t }}</option>
+          </select></label
+        >
+        @if(operation!=='remove'){<label>
+          {{ "Adjustment value" | t }} <input [(ngModel)]="value" inputmode="decimal" /><small
+            >{{operation.startsWith('percentage')?'Enter 0.10 for 10%. Applied to each selected
+            baseline month.':'Amount applied to each selected month, in the baseline
+            currency.'}}</small
+          ></label
+        >} } @else {
+        <label>
+          {{ "Component key" | t }}
+          <input [(ngModel)]="component" [attr.placeholder]='"branch_rent" | t' /><small>
+            {{ "Identifies the expense or revenue stream; helps prevent double counting." | t }}
+          </small></label
+        >
+        <label>
+          {{ "Category" | t }}
+          <select [(ngModel)]="category">
+            @for(c of categories;track c){
+            <option [value]="c">{{ (text(c)) | t }}</option>
+            }</select
+          ><small>
+            {{ "What the item represents, separate from how its amount is calculated." | t }}
+          </small></label
+        >
+        <label>
+          {{ "Amount driver" | t }}
+          <select [(ngModel)]="driver">
+            <option value="fixed">{{ "Fixed monthly amount" | t }}</option>
+            <option value="headcount">{{ "Employee count × loaded monthly cost" | t }}</option>
+            <option value="revenue_linked">{{ "Explicit revenue-linked cost" | t }}</option>
+          </select></label
+        >
+        @if(driver==='fixed'){<label>
+          {{ "Monthly amount" | t }} <input [(ngModel)]="amount" inputmode="decimal" /><small>
+            {{ "Leave blank if unknown. Enter 0 only when explicitly reviewed as zero." | t }}
+          </small></label
+        >} @if(driver==='headcount'){<label>
+          {{ "Additional employees" | t }} <input [(ngModel)]="count" inputmode="numeric" /><small>
+            {{ "Number of new employees used to calculate payroll." | t }}
+          </small></label
+        ><label>
+          {{ "Loaded monthly cost per employee" | t }}
+          <input [(ngModel)]="monthlyCost" inputmode="decimal" /><small>
+            {{ "Include all employer costs you intend to model; no benefits or taxes are inferred."
+            | t }}
+          </small></label
+        ><label>
+          {{ "Total one-time onboarding cost" | t }}
+          <input [(ngModel)]="onboarding" inputmode="decimal" /><small>
+            {{ "Total for all new employees, applied once under the selected timing. Enter 0 if
+            there is no onboarding cost." | t }}
+          </small></label
+        >} @if(driver==='revenue_linked'){<label>
+          {{ "Revenue component key" | t }} <input [(ngModel)]="baseComponent" /><small>
+            {{ "Exact component key of the revenue basis." | t }}
+          </small></label
+        ><label>
+          {{ "Cost proportion" | t }} <input [(ngModel)]="rate" inputmode="decimal" /><small>
+            {{ "0.30 means a cost of 30% of that revenue." | t }}
+          </small></label
+        >} @if(directCash()){
+        <p class="finding">
+          {{ "This is a direct cash schedule. Start and end months are the actual payment or receipt
+          months; the amount repeats in each selected month. Add separate items for staged amounts.
+          No additional delay is applied." | t }}
+        </p>
+        } @else {<label>
+          {{ "Receipt / payment timing" | t }}
+          <select [(ngModel)]="timing">
+            <option value="">{{ "Unknown — needs input" | t }}</option>
+            <option value="profile">{{ "Explicit month offset" | t }}</option>
+            <option value="non_cash">{{ "Non-cash item" | t }}</option></select
+          ><small>
+            {{ "Financial activity and cash movement can occur in different months." | t }}
+          </small></label
+        >
+        @if(timing==='profile'){<label>
+          {{ "Cash delay in months" | t }}
+          <input type="number" min="0" max="24" [(ngModel)]="offset" /><small>
+            {{ "0 = same month; 1 = following month. Amounts beyond the horizon remain visible." | t
+            }}
+          </small></label
+        >} } }
+        <label>
+          {{ "Evidence type" | t }}
+          <select [(ngModel)]="source">
+            <option value="assumption">{{ "Explicit assumption" | t }}</option>
+            <option value="observed">{{ "Observed data" | t }}</option>
+            <option value="schedule">{{ "Known schedule" | t }}</option>
+          </select></label
+        ><label>
+          {{ "Source reference" | t }}
+          <input
+            [(ngModel)]="reference"
+            [attr.placeholder]='"Management plan September" | t'
+          /><small>
+            {{ "Identifies the document or person supporting this input." | t }}
+          </small></label
+        ><label>
+          {{ "Explanation" | t }}
+          <input
+            [(ngModel)]="note"
+            [attr.placeholder]='"Proposed monthly marketing budget" | t'
+          /><small>
+            {{ "Explain the amount and timing so the assumption can be reviewed." | t }}
+          </small></label
+        >
+      </div>
+      @if(mode==='entry'){<label class="check"
+        ><input type="checkbox" [(ngModel)]="committed" /> {{ "Treat this input as a financial
+        commitment" | t }} </label
+      >} @if(mode==='adjust'&&targetExplicit()){
+      <h4>{{ "Replacement cash schedule" | t }}</h4>
+      <p>
+        {{ "The baseline uses explicit receipts/payments. Supply the full replacement amounts for
+        the changed activity months; they are never automatically scaled." | t }}
+      </p>
+      @for(r of replacements;track $index){
+      <div class="input-grid">
+        <label>
+          {{ "Activity month" | t }} <input type="month" [(ngModel)]="r.activityPeriod" /></label
+        ><label> {{ "Cash month" | t }} <input type="month" [(ngModel)]="r.period" /></label
+        ><label> {{ "Cash amount" | t }} <input [(ngModel)]="r.amount" /></label
+        ><button (click)="replacements.splice($index,1)">{{ "Remove payment" | t }}</button>
+      </div>
+      }
+      <button (click)="replacements.push({activityPeriod:start,period:start,amount:'',date:null})">
+        {{ "Add replacement payment" | t }}
+      </button>
+      }
+      <details>
+        <summary>{{ "Explicit dependencies" | t }}</summary>
+        <p>
+          {{ "A new revenue-linked cost must reference the new revenue change it depends on.
+          Dependencies cannot reverse financial execution order." | t }}
+        </p>
+        @for(c of document.changes;track c.id){@if(c.id!==editId){<label class="check"
+          ><input
+            type="checkbox"
+            [checked]="dependencies.includes(c.id)"
+            (change)="toggleDependency(c.id,$any($event.target).checked)"
+          />{{c.label}}</label
+        >}}
+      </details>
+      <div class="actions">
+        <button class="primary" (click)="addChange()">
+          {{(editId?'Update change':'Add change')|t}}</button
+        ><button (click)="resetEditor()">{{ "Clear editor" | t }}</button>
+      </div>
+    </fieldset>
+    @if(document.expansion;as ex){
+    <h3>{{ "Expansion coverage" | t }}</h3>
+    <p>
+      {{ "Add explicit investment payments (including zero if reviewed), operating costs, payroll
+      and revenue using the change editor. For a revenue ramp, use separate non-overlapping month
+      ranges." | t }}
+    </p>
+    <div class="input-grid">
+      <label>
+        {{ "Expansion revenue" | t }}
+        <select [(ngModel)]="ex.revenueMode">
+          <option [ngValue]="null">{{ "Not reviewed — needs input" | t }}</option>
+          <option value="modeled">{{ "Include explicitly supplied revenue" | t }}</option>
+          <option value="excluded_unknown">
+            {{ "Revenue unknown — evaluate costs only" | t }}
+          </option></select
+        ><small>
+          {{ "Expected revenue is needed to evaluate benefits or payback. Unknown revenue is
+          excluded explicitly, never invented." | t }}
+        </small></label
+      ><label>
+        {{ "Coverage explanation" | t }} <input [(ngModel)]="ex.note" /><small>
+          {{ "Explain which expansion costs and benefits are included or excluded." | t }}
+        </small></label
+      >
+    </div>
+    <label class="check"
+      ><input type="checkbox" [(ngModel)]="ex.costsReviewed" /> {{ "I reviewed operating costs,
+      payroll and commitments and added all intended effects (including explicit zero where
+      applicable)." | t }} </label
+    ><label class="check"
+      ><input type="checkbox" [(ngModel)]="document.paybackRequested" /> {{ "Evaluate simple
+      incremental cash payback if the supplied structure supports it" | t }} </label
+    >}
+  </fieldset>
+</details>
+<section class="card planning-section">
+  <h2 id="scenario-review">{{ "3. Review changes and confirm assumptions" | t }}</h2>
+  <p>
+    {{ "These changes are separate from the pinned baseline. A positive difference means the
+    scenario value is higher, which is not automatically better." | t }}
+  </p>
+  @for(c of document.changes;track c.id){
+  <article class="finding">
+    <strong>{{c.label}} · {{(text(c.decision))|t}}</strong>
+    <p>{{describe(c)}}</p>
+    <p>{{(text(c.source.kind))|t}} · {{c.source.reference}} · {{c.source.note}}</p>
+    @if(c.primitive.kind==='entry'){<small>
+      {{ "Cash timing: {0}" | t:[(c.primitive.entry.cashTreatment | json)] }} </small
+    >}
+    <div class="actions">
+      <button [disabled]="busy()||!can('scenario.edit')" (click)="edit(c)">
+        {{ "Edit {0}" | t:[(c.label)] }}</button
+      ><button [disabled]="busy()||!can('scenario.edit')" (click)="remove(c.id)">
+        {{ "Remove {0}" | t:[(c.label)] }}
+      </button>
+    </div>
+  </article>
+  } @if(!document.changes.length){
+  <p>{{ "No changes yet. A zero-change scenario reproduces the baseline." | t }}</p>
+  }
+  <div class="actions">
+    <button [disabled]="busy()||!can('scenario.edit')" (click)="saveDraft()">
+      {{ "Save draft" | t }}</button
+    ><button [disabled]="busy()||!can('scenario.edit')" (click)="validate()">
+      {{ "Check readiness" | t }}
+    </button>
+  </div>
+  @if(report();as r){
+  <div class="finding" role="status">
+    <h3>{{ "Readiness: {0}" | t:[(text(r.readiness))] }}</h3>
+    <p>{{ "Evidence sources: {0}" | t:[(r.evidence.join(', ') || 'Baseline only')] }}</p>
+    @for(f of r.findings;track $index){
+    <p><strong>{{ (text(f.readiness)) | t }}</strong> {{f.message|t}}</p>
+    }@for(l of r.limitations;track $index){
+    <p>{{l|t}}</p>
+    }
+  </div>
+  }
+  <label class="check"
+    ><input type="checkbox" [(ngModel)]="approved" /> {{ "I reviewed the changes, sources, timing
+    and limitations and confirm these assumptions for this scenario." | t }}
+  </label>
+  <div class="actions">
+    <button
+      class="primary"
+      [disabled]="busy()||!approved||!report()?.executable||!can('scenario.edit')"
+      (click)="confirm()"
+    >
+      {{ "Confirm immutable version" | t }}
+    </button>
+  </div>
+  @if(versionId){
+  <p>{{ "Confirmed scenario version: {0}" | t:[(versionId)] }}</p>
+  <button class="primary" [disabled]="busy()||!can('scenario.run')" (click)="run()">
+    {{ "Run confirmed scenario" | t }}</button
+  >}
+</section>
+} }
+<details
+  class="card workbench-history"
+  [open]="!result() && (!!records.draft || !!records.run || !!records.dataset || !!records.file || !!records.comparison)"
+>
+  <summary>{{ "Saved work & history" | t }}</summary>
+  <div class="input-grid">
+    <label>
+      {{ "Drafts" | t }}
+      <select
+        data-record-picker
+        #draftSelect
+        (change)="navigate.emit({page:'decisions',records:{draft:draftSelect.value}})"
+        [disabled]="busy()"
+      >
+        <option value="" disabled selected>{{ "Reopen a draft" | t }}</option>
+        @for(d of drafts();track d.id){
+        <option [value]="d.id">{{d.title}} · {{d.id.slice(0,8)}}</option>
+        }
+      </select></label
+    ><label>
+      {{ "Historical runs" | t }}
+      <select
+        data-record-picker
+        #runSelect
+        (change)="navigate.emit({page:'decisions',records:{run:runSelect.value}})"
+        [disabled]="busy()"
+      >
+        <option value="" disabled selected>{{ "Reopen a saved result" | t }}</option>
+        @for(r of runs();track r.id){
+        <option [value]="r.id">{{r.title}} · {{r.id.slice(0,8)}}</option>
+        }
+      </select></label
+    >
+  </div>
+  @if(workspace.kind!=='demo'){<label>
+    {{ "Confirmed version to run" | t }}
+    <select [(ngModel)]="versionId">
+      <option value="">{{ "Select immutable version" | t }}</option>
+      @for(v of versions();track v.id){
+      <option [value]="v.id">{{v.title}} · {{v.id.slice(0,8)}}</option>
+      }
+    </select></label
+  ><button [disabled]="busy()||!versionId||!can('scenario.run')" (click)="run()">
+    {{ "Run selected historical version" | t }}</button
+  >}
+</details>
+@if(result();as r){
+<section class="card planning-section">
+  <h2>{{ "Baseline vs scenario" | t }}</h2>
+  <details class="evidence-disclosure">
+    <summary>{{"Source assignments and lineage"|t}}</summary>
+    <p>
+      {{ "Saved run {0} · {1} · baseline {2} · scenario {3}" |
+      t:[(runId),(r.manifest.currency),(r.manifest.baselineVersionId),(r.manifest.scenarioVersionId)]
+      }}
+    </p>
+  </details>
+  <p>
+    {{ "Absolute company results and incremental differences are shown separately. Operating Result
+    is not Net Profit. Funding gap is an analytical requirement; no financing is added." | t }}
+  </p>
+  <details class="evidence-disclosure">
+    <summary>{{'Detailed baseline and scenario comparison'|t}}</summary>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>{{ "Month / metric" | t }}</th>
+            <th>{{ "Baseline" | t }}</th>
+            <th>{{ "Scenario" | t }}</th>
+            <th>{{ "Difference" | t }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for(p of r.comparison.periods;track p.period){@for(m of metrics;track m){
+          <tr>
+            <th>{{p.period}} · {{(text(m))|t}}</th>
+            <td>{{ p.metrics[m].baseline | money }}</td>
+            <td>{{ p.metrics[m].scenario | money }}</td>
+            <td>{{ p.metrics[m].difference | money }}</td>
+          </tr>
+          }}
+          <tr>
+            <th>{{ "Minimum cash" | t }}</th>
+            <td>{{ (display(r.comparison.minimumCash.baseline)) | t }}</td>
+            <td>{{ (display(r.comparison.minimumCash.scenario)) | t }}</td>
+            <td>{{ (display(r.comparison.minimumCash.difference)) | t }}</td>
+          </tr>
+          <tr>
+            <th>{{ "Month of minimum cash" | t }}</th>
+            <td>{{ (display(r.baseline.minimumCash?.period)) | t }}</td>
+            <td>{{ (display(r.scenario.minimumCash?.period)) | t }}</td>
+            <td>—</td>
+          </tr>
+          <tr>
+            <th>{{ "Funding gap" | t }}</th>
+            <td>{{ (display(r.comparison.fundingGap.baseline)) | t }}</td>
+            <td>{{ (display(r.comparison.fundingGap.scenario)) | t }}</td>
+            <td>{{ (display(r.comparison.fundingGap.difference)) | t }}</td>
+          </tr>
+          <tr>
+            <th>{{ "Reserve breach" | t }}</th>
+            <td>{{ (display(r.comparison.reserveBreach.baseline)) | t }}</td>
+            <td>{{ (display(r.comparison.reserveBreach.scenario)) | t }}</td>
+            <td>—</td>
+          </tr>
+          <tr>
+            <th>{{ "First reserve breach" | t }}</th>
+            <td>
+              {{(r.comparison.firstReserveBreach.baseline ?? (r.comparison.reserveBreach.baseline
+              === null ? 'Not available' : 'None in horizon'))|t}}
+            </td>
+            <td>
+              {{(r.comparison.firstReserveBreach.scenario ?? (r.comparison.reserveBreach.scenario
+              === null ? 'Not available' : 'None in horizon'))|t}}
+            </td>
+            <td>—</td>
+          </tr>
+          <tr>
+            <th>{{ "First negative cash month" | t }}</th>
+            <td>
+              {{(r.comparison.firstNegativePeriod.baseline ?? (r.baseline.minimumCash ? 'None in
+              horizon' : 'Not available'))|t}}
+            </td>
+            <td>
+              {{(r.comparison.firstNegativePeriod.scenario ?? (r.scenario.minimumCash ? 'None in
+              horizon' : 'Not available'))|t}}
+            </td>
+            <td>—</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </details>
+  <h3>{{ "Payback: {0}" | t:[(text(r.payback.status)|t)] }}</h3>
+  <p><bdi>{{r.payback.period}}</bdi> {{r.payback.reason|t}}</p>
+  <h3>{{ "Break-even: Not available with current inputs" | t }}</h3>
+  <p>{{r.breakEven.reason|t}}</p>
+  <details>
+    <summary>{{ "Commitments and cash beyond the horizon" | t }}</summary>
+    <p>
+      {{ "Recognized commitments and cash commitments are separate measures; do not add them
+      together." | t }}
+    </p>
+    <h4>{{ "Baseline" | t }}</h4>
+    <pre>{{r.baseline.commitments | json}}</pre>
+    <pre>{{r.baseline.tailMovements | json}}</pre>
+    <h4>{{ "Scenario" | t }}</h4>
+    <pre>{{r.scenario.commitments | json}}</pre>
+    <pre>{{r.scenario.tailMovements | json}}</pre>
+  </details>
+  <details>
+    <summary>{{ "Limitations" | t }}</summary>
+    @for(l of r.readiness.limitations;track $index){
+    <p>{{l|t}}</p>
+    }@for(l of r.scenario.limitations;track $index){
+    <p>{{l|t}}</p>
+    }
+  </details>
+  <div class="actions">
+    <button [disabled]="busy()" (click)="inspect()">{{ "How was this calculated?" | t }}</button
+    ><button [disabled]="busy()||!can('scenario.run')" (click)="replay()">
+      {{ "Verify replay" | t }}
+    </button>
+  </div>
+  @if(evidence()){
+  <div class="evidence-panel">
+    <h3>{{ "Calculation evidence" | t }}</h3>
+    <p>
+      {{ "Includes original baseline inputs, confirmed scenario assumptions, transformed inputs
+      through lineage, timing, source and confirmation attribution, financial policy, engine
+      versions and incremental results." | t }}
+    </p>
+    <h4>{{ "Confirmed changes behind this result" | t }}</h4>
+    @for(c of r.changes;track c.id){
+    <p>
+      <strong>{{c.label}}:</strong> {{describe(c)}}. {{(text(c.source.kind))|t}} —
+      {{c.source.reference}}: {{c.source.note}}
+    </p>
+    }
+    <p>
+      {{ "Financial policy: {0}. Both paths use {1}. Confirmed {2} by {3}." |
+      t:[(r.manifest.roundingPolicyVersion),(r.manifest.financialEngineVersion),(r.manifest.confirmedAt),(r.manifest.confirmedBy)]
+      }}
+    </p>
+    <h4>{{ "Financial activity and cash movements" | t }}</h4>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>{{ "Item / source" | t }}</th>
+            <th>{{ "Activity month" | t }}</th>
+            <th>{{ "Movement month" | t }}</th>
+            <th>{{ "Effect / amount" | t }}</th>
+            <th>{{ "Calculation" | t }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for(m of r.scenario.evidence;track m.id){
+          <tr>
+            <td>{{m.label}}<small>{{(text(m.source))|t}} · {{m.note}}</small></td>
+            <td>{{m.activityPeriod}}</td>
+            <td>{{m.period}}</td>
+            <td>{{(text(m.effect))|t}} · {{m.amount}}</td>
+            <td>
+              {{m.transformation}}<small>
+                {{ "Input version {0}" | t:[(m.sourceVersionId)] }}
+              </small>
+            </td>
+          </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    <details>
+      <summary>{{ "Full source snapshots, policy and lineage" | t }}</summary>
+      <pre>{{evidence() | json}}</pre>
+    </details>
+    <details>
+      <summary>{{ "Modified inputs used by the financial engine" | t }}</summary>
+      <pre>{{r.modifiedInputs | json}}</pre>
+    </details>
+  </div>
+  }
+</section>
+}
+<section class="card planning-section">
+  <h2>{{ "Compare alternatives A / B / C" | t }}</h2>
+  <p>
+    {{ "Select up to three saved runs against the same baseline and financial policy. The platform
+    does not rank alternatives." | t }}
+  </p>
+  <label> {{ "Comparison name" | t }} <input [(ngModel)]="comparisonTitle" /></label>
+  @for(r of runs();track r.id){<label class="check"
+    ><input
+      type="checkbox"
+      [checked]="selected.includes(r.id)"
+      [disabled]="!selected.includes(r.id)&&selected.length>=3"
+      (change)="toggleRun(r.id,$any($event.target).checked)"
+    />
+    {{ "{0} · run {1} · baseline {2}" |
+    t:[(r.title),(r.id.slice(0,8)),(r.baseline_version_id?.slice(0,8))] }} </label
+  >}
+  <div class="actions">
+    <button
+      [disabled]="busy()||!selected.length||!can('comparison.view')"
+      (click)="saveComparison()"
+    >
+      {{ "Save comparison" | t }}
+    </button>
+  </div>
+  <label>
+    {{ "Saved comparisons" | t }}
+    <select
+      data-record-picker
+      #comparisonSelect
+      (change)="navigate.emit({page:'decisions',records:{comparison:comparisonSelect.value}})"
+    >
+      <option value="" disabled selected>{{ "Reopen comparison" | t }}</option>
+      @for(c of comparisons();track c.id){
+      <option [value]="c.id">{{c.title}}</option>
+      }
+    </select></label
+  >
+  @if(comparison();as c){
+  <h3>{{c.title}}</h3>
+  <p>{{ "Compatible baseline: {0}" | t:[(c.baselineVersionId)] }}</p>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>{{ "Month / metric" | t }}</th>
+          <th>{{ "Baseline" | t }}</th>
+          @for(r of c.runs;track r.id){
+          <th>{{r.title}}</th>
+          }
+        </tr>
+      </thead>
+      <tbody>
+        @for(p of c.runs[0].result.comparison.periods;track p.period;let i=$index){@for(m of
+        metrics;track m){
+        <tr>
+          <th>{{p.period}} · {{(text(m))|t}}</th>
+          <td>{{ p.metrics[m].baseline | money }}</td>
+          @for(r of c.runs;track r.id){
+          <td>{{ (display(r.result.comparison.periods[i].metrics[m].scenario)) | t }}</td>
+          }
+        </tr>
+        }}
+        <tr>
+          <th>{{ "Minimum cash" | t }}</th>
+          <td>{{ (display(c.runs[0].result.comparison.minimumCash.baseline)) | t }}</td>
+          @for(r of c.runs;track r.id){
+          <td>{{ (display(r.result.comparison.minimumCash.scenario)) | t }}</td>
+          }
+        </tr>
+        <tr>
+          <th>{{ "Funding gap" | t }}</th>
+          <td>{{ (display(c.runs[0].result.comparison.fundingGap.baseline)) | t }}</td>
+          @for(r of c.runs;track r.id){
+          <td>{{ (display(r.result.comparison.fundingGap.scenario)) | t }}</td>
+          }
+        </tr>
+        <tr>
+          <th>{{ "Reserve breach" | t }}</th>
+          <td>{{ (display(c.runs[0].result.comparison.reserveBreach.baseline)) | t }}</td>
+          @for(r of c.runs;track r.id){
+          <td>{{ (display(r.result.comparison.reserveBreach.scenario)) | t }}</td>
+          }
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  }
+</section>
+
+@if(runId){
+<section class="card journey-actions">
+  <h2>{{'Next steps'|t}}</h2>
+  <button (click)="navigate.emit({page:'stress',records:{source:'scenario',run:runId}})">
+    {{'Stress this saved result'|t}}
+  </button>
+</section>
+} @if(!busy()){<record-history
+  [expanded]="true"
+  title="Saved drafts"
+  [records]="drafts()"
+  (openRecord)="navigate.emit({page:'decisions',records:{draft:$event}})"
+/>}

@@ -1,0 +1,553 @@
+@if(navigation.prompt()){
+<div class="dialog-backdrop">
+  <section
+    data-leave-dialog
+    role="alertdialog"
+    aria-modal="true"
+    aria-labelledby="leave-title"
+    aria-describedby="leave-description"
+    (keydown)="navigation.promptKey($event)"
+  >
+    <h2 id="leave-title">{{'Unsaved changes'|t}}</h2>
+    <p id="leave-description">{{'You have unsaved changes. Leave and discard them?'|t}}</p>
+    <div class="actions">
+      <button data-keep-editing class="primary" (click)="navigation.decide(false)">
+        {{'Keep editing'|t}}</button
+      ><button (click)="navigation.decide(true)">{{'Discard changes and leave'|t}}</button>
+    </div>
+  </section>
+</div>
+}
+<router-outlet />
+<div
+  class="app"
+  [attr.inert]="navigation.prompt() ? '' : null"
+  [class.has-workspace]="active()"
+  [class.nav-open]="menuOpen"
+>
+  <a inPage class="skip-link" href="#main-content"> {{ "Skip to content" | t }} </a>
+  <header class="app-topbar">
+    <a
+      class="brand"
+      href="/workspaces"
+      (click)="$event.preventDefault();allWorkspaces()"
+      [attr.aria-label]='"Financial Decision Simulator home" | t'
+      ><span class="mark">↗</span
+      ><span>
+        {{ "Financial Decision Simulator" | t }}<small>
+          {{ "SME FINANCIAL SIMULATOR" | t }}
+        </small></span
+      ></a
+    >
+    @if(active()){<button
+      class="nav-toggle"
+      (click)="menuOpen=!menuOpen"
+      (keydown.escape)="menuOpen=false"
+      [attr.aria-expanded]="menuOpen"
+      aria-controls="workspace-nav"
+    >
+      {{ "Menu" | t }}
+    </button>
+    <div class="breadcrumb">
+      <span>{{active()!.name}}</span><span aria-hidden="true">/</span
+      ><strong>{{pageNames[tab()]|t}}</strong>
+    </div>
+    }
+    <div class="header-right">
+      <div class="locale-control" role="group" [attr.aria-label]='"Language" | t'>
+        <button (click)="locale.set('en')" [attr.aria-pressed]="locale.locale()==='en'">
+          {{ "EN" | t }}</button
+        ><button (click)="locale.set('ar')" [attr.aria-pressed]="locale.locale()==='ar'">
+          العربية
+        </button>
+      </div>
+      <span class="pill"> {{ "Monthly planning" | t }} </span>@if (user()) {
+      <button class="quiet account-control" (click)="openAccount()" [attr.aria-label]="'Account'|t">
+        {{'Account'|t}}</button
+      ><button class="quiet" (click)="logout()" [disabled]="busy()">{{ "Sign out" | t }}</button> }
+    </div>
+  </header>
+  @if (error()) {
+  <div class="message error" role="alert">{{ (error()) | t }}</div>
+  } @if (notice()) {
+  <div class="message success" role="status">{{ (notice()) | t }}</div>
+  } @if (!loaded()) {
+  <main id="main-content" tabindex="-1">
+    <p role="status">{{ "Loading your workspace…" | t }}</p>
+  </main>
+  } @else if (!user()) {
+  <main id="main-content" class="auth-layout" tabindex="-1">
+    <section class="intro">
+      <div class="eyebrow">{{ "A CLEARER VIEW OF WHAT COMES NEXT" | t }}</div>
+      <h1>
+        {{ "Good decisions" | t }} <br />
+        {{ "start with" | t }} <br /><em> {{ "clear assumptions." | t }} </em>
+      </h1>
+      <p>
+        {{ "A place to explore your company’s financial choices—with a shared planning foundation
+        and a traceable history." | t }}
+      </p>
+      <div class="principles">
+        <span>01 <b> {{ "Understand the inputs" | t }} </b></span
+        ><span>02 <b> {{ "Explore the alternatives" | t }} </b></span
+        ><span>03 <b> {{ "Decide with context" | t }} </b></span>
+      </div>
+      <div class="intro-note">{{ "Built for planning. Your business stays in control." | t }}</div>
+    </section>
+    <section class="card auth-card">
+      <div class="eyebrow">{{ "YOUR PLANNING SPACE" | t }}</div>
+      <h2>{{ (registering ? 'Create your account' : 'Welcome back') | t }}</h2>
+      <p class="muted">
+        {{ (registering ? 'Start personally. Create or join a company when you’re ready.' : 'Sign in
+        to access your company or personal demo.') | t }}
+      </p>
+      <form (ngSubmit)="authenticate()">
+        @if (registering) {
+        <label>
+          {{ "Full name" | t }}
+          <input
+            name="displayName"
+            [(ngModel)]="displayName"
+            autocomplete="name"
+            required
+            maxlength="80"
+        /></label>
+        }<label>
+          {{ "Email address" | t }}
+          <input
+            name="email"
+            type="email"
+            [(ngModel)]="email"
+            autocomplete="email"
+            required
+            maxlength="254"
+            [attr.placeholder]='"you@company.com" | t' /></label
+        ><label>
+          {{ "Password" | t }}
+          <input
+            name="password"
+            type="password"
+            [(ngModel)]="password"
+            [attr.autocomplete]="registering ? 'new-password' : 'current-password'"
+            required
+            minlength="12"
+            maxlength="128" /></label
+        >@if (registering) {
+        <small class="muted"> {{ "Use at least 12 characters." | t }} </small> }<button
+          class="primary full"
+          [disabled]="busy()"
+        >
+          {{ (busy() ? 'Please wait…' : registering ? 'Create account' : 'Sign in') | t }}<span
+            >→</span
+          >
+        </button>
+      </form>
+      <button class="text-button full" (click)="authMode()">
+        {{ (registering ? 'Already have an account? Sign in' : 'New here? Create an account') | t }}
+      </button>
+    </section>
+  </main>
+  } @else if (account()) {
+  <main id="main-content" class="chooser" tabindex="-1">
+    <h1>{{'Account'|t}}</h1>
+    <section class="card">
+      <h2>{{user()!.displayName}}</h2>
+      <p><bdi>{{user()!.email}}</bdi></p>
+      <p>
+        {{'Your account is separate from company roles. Language preferences apply to this
+        browser.'|t}}
+      </p>
+      <button (click)="allWorkspaces()">{{'All workspaces'|t}}</button>
+    </section>
+  </main>
+  } @else if (routeLoading()) {
+  <main id="main-content" tabindex="-1"><p role="status">{{'Loading your workspace…'|t}}</p></main>
+  } @else if (!active()) {
+  <main id="main-content" class="chooser workspace-chooser" tabindex="-1">
+    <div class="eyebrow">{{ "YOUR WORKSPACES" | t }}</div>
+    <h1>{{ "Where would you like to plan?" | t }}</h1>
+    <p class="muted lead">
+      {{ "One account. Separate spaces for your company and your personal demo." | t }}
+    </p>
+    <div class="chooser-composition">
+      <section class="chooser-spaces">
+        <div class="workspace-grid">
+          @for (w of workspaces(); track w.id) {
+          <button
+            class="card workspace-card"
+            (click)="select(w)"
+            [disabled]="busy() || w.status !== 'active'"
+          >
+            <span class="icon-box">{{ w.kind === 'demo' ? '◈' : '▦' }}</span>
+            <h3>{{ w.name }}</h3>
+            <p>
+              @if(w.kind === 'demo') { {{ 'Personal demo · Synthetic data only' | t }} } @else {
+              <bdi>{{w.currency}}</bdi> · {{w.role|t}} }
+            </p>
+            <span class="card-link"
+              >{{ (w.status === 'archived' ? 'Archived' : 'Open workspace →') | t }}</span
+            >
+          </button>
+          }
+        </div>
+        <section class="card">
+          <span class="eyebrow"> {{ "EXPLORE" | t }} </span>
+          <h2>{{ "Your personal demo" | t }}</h2>
+          <p class="muted">
+            {{ "A private, synthetic-data context. Real financial uploads are disabled. Three
+            financial baseline examples are available." | t }}
+          </p>
+          <button class="secondary" (click)="demo()" [disabled]="busy()">
+            {{ "Enter demo →" | t }}
+          </button>
+        </section>
+      </section>
+      <div class="setup-grid">
+        <section class="card">
+          <span class="eyebrow"> {{ "BUILD YOUR FOUNDATION" | t }} </span>
+          <h2>{{ "Create a company workspace" | t }}</h2>
+          <form (ngSubmit)="createCompany()">
+            <label>
+              {{ "Company name" | t }}
+              <input
+                name="companyName"
+                [(ngModel)]="companyName"
+                required
+                maxlength="120"
+                [attr.placeholder]='"Your company" | t' /></label
+            ><label>
+              {{ "Base currency" | t }}
+              <select name="currency" [(ngModel)]="currency">
+                <option>{{ "EGP" | t }}</option>
+                <option>{{ "SAR" | t }}</option>
+                <option>{{ "USD" | t }}</option>
+                <option>{{ "AED" | t }}</option></select
+              ><small>
+                {{ "This currency is fixed after creation. All values must use it; currency
+                conversion is not supported." | t }}
+              </small></label
+            ><button class="primary" [disabled]="busy()">{{ "Create workspace →" | t }}</button>
+          </form>
+        </section>
+      </div>
+    </div>
+    <section class="join-panel">
+      <h3>{{ "Have an invitation?" | t }}</h3>
+      <form (ngSubmit)="join()">
+        <label class="sr-only" for="joinToken"> {{ "Invitation token" | t }} </label
+        ><input
+          id="joinToken"
+          name="joinToken"
+          [(ngModel)]="joinToken"
+          [attr.placeholder]='"Paste your private invitation token" | t'
+          required
+        /><button class="secondary" [disabled]="busy()">{{ "Join workspace" | t }}</button>
+      </form>
+    </section>
+  </main>
+  } @else {
+  <div class="workspace-layout">
+    <aside id="workspace-nav" (click)="menuOpen=false" (keydown.escape)="closeMenu()">
+      <button class="back" (click)="allWorkspaces()">{{ "← All workspaces" | t }}</button>
+      <div class="workspace-identity">
+        <span class="icon-box">{{ active()!.kind === 'demo' ? '◈' : '▦' }}</span>
+        <h3>{{ active()!.name }}</h3>
+        <span class="muted"
+          >{{(active()!.kind === 'demo' ? 'PERSONAL DEMO' : active()!.role)|t}}</span
+        >
+      </div>
+      <nav [attr.aria-label]='"Workspace navigation" | t'>
+        <span class="nav-group"> {{ "WORKSPACE" | t }} </span>
+        @if(active()!.kind==='company'){<button
+          (click)="go('setup')"
+          [class.selected]="tab()==='setup'"
+          [attr.aria-current]="tab()==='setup'?'page':null"
+        >
+          {{'Company setup'|t}}</button
+        >}
+        <button
+          [class.selected]="tab()==='overview'"
+          [attr.aria-current]="tab()==='overview'?'page':null"
+          (click)="go('overview')"
+        >
+          <span aria-hidden="true">◫</span> {{ "Executive Overview" | t }}
+        </button>
+        <span class="nav-group"> {{ "PLANNING & SCENARIOS" | t }} </span>
+        <button
+          [class.selected]="tab()==='planning'"
+          [attr.aria-current]="tab()==='planning'?'page':null"
+          (click)="go('planning')"
+        >
+          <span aria-hidden="true">▤</span> {{ "Financial Baseline" | t }}
+        </button>
+        <button
+          [class.selected]="tab()==='forecasts'"
+          [attr.aria-current]="tab()==='forecasts'?'page':null"
+          (click)="go('forecasts')"
+        >
+          <span aria-hidden="true">⌁</span> {{ "Forecasting" | t }}
+        </button>
+        <button
+          [class.selected]="tab()==='decisions'"
+          [attr.aria-current]="tab()==='decisions'?'page':null"
+          (click)="go('decisions')"
+        >
+          <span aria-hidden="true">◇</span> {{ "Scenario Builder" | t }}
+        </button>
+        <span class="nav-group"> {{ "RISK & DECISION EVIDENCE" | t }} </span>
+        <button
+          [class.selected]="tab()==='stress'"
+          [attr.aria-current]="tab()==='stress'?'page':null"
+          (click)="go('stress')"
+        >
+          <span aria-hidden="true">⌁</span> {{ "Risk Center" | t }}
+        </button>
+        <button
+          [class.selected]="tab()==='briefs'"
+          [attr.aria-current]="tab()==='briefs'?'page':null"
+          (click)="go('briefs')"
+        >
+          <span aria-hidden="true">▧</span> {{ "Decision Briefs" | t }}
+        </button>
+        <span class="nav-group"> {{ "DATA & GOVERNANCE" | t }} </span>
+        <button
+          [class.selected]="tab()==='imports'"
+          [attr.aria-current]="tab()==='imports'?'page':null"
+          (click)="go('imports')"
+        >
+          <span aria-hidden="true">⇄</span> {{ "Data & Imports" | t }}
+        </button>
+        @if(can('members.manage')){<button
+          [class.selected]="tab()==='members'"
+          [attr.aria-current]="tab()==='members'?'page':null"
+          (click)="showMembers()"
+        >
+          <span aria-hidden="true">♧</span> {{ "Team & access" | t }}</button
+        >} @if(can('workspace.edit')){<button
+          [class.selected]="tab()==='settings'"
+          [attr.aria-current]="tab()==='settings'?'page':null"
+          (click)="go('settings')"
+        >
+          <span aria-hidden="true">⚙</span> {{ "Settings" | t }}</button
+        >}
+      </nav>
+      <div class="aside-note">
+        @if(active()!.kind==='demo'){
+        <p>{{'Personal Demo keeps company management separate.'|t}}</p>
+        } @else if(!can('members.manage')){
+        <p>{{'Team and workspace settings are managed by an Owner.'|t}}</p>
+        }
+
+        <span class="status-dot"></span> {{ "Private workspace" | t }}
+        <p>{{ "Access is limited to authorized people." | t }}</p>
+      </div>
+    </aside>
+    <main id="main-content" class="workspace-main" tabindex="-1">
+      <div class="evidence-strip">
+        <strong>{{active()!.name}}</strong><span>{{active()!.currency}}</span
+        ><span>{{active()!.role|t}}</span>@if(records.run){<span
+          >{{'Source run'|t}} <bdi>{{records.run}}</bdi></span
+        >}@if(records.version){<span>{{'Planning version'|t}} <bdi>{{records.version}}</bdi></span
+        >}
+      </div>
+      @if(navigation.pending()){
+      <p role="status">{{'Working…'|t}}</p>
+      } @if(navigation.dirty()){
+      <p role="status" class="warning">
+        {{'Unsaved changes. Save your draft before leaving, or choose to discard.'|t}}
+      </p>
+      } @if (tab()==='setup' && active()!.kind==='company') {
+      <section class="card setup-checklist">
+        <h2>{{'Company setup'|t}}</h2>
+        <p>
+          {{'Resume from saved evidence. Forecasting is optional; reviewed assumptions and schedules
+          can support your plan.'|t}}
+        </p>
+        @if(setup();as s){
+        <ol>
+          <li>
+            <button (click)="go('imports')">{{'Data & Imports'|t}}</button>
+            <button (click)="go('planning')">{{'Financial Baseline'|t}}</button
+            ><span>{{s.versions}} {{'Confirmed versions'|t}}</span>
+          </li>
+          <li>
+            <button (click)="go('planning')">{{'Review and publish baseline'|t}}</button
+            ><span>{{s.published}} {{'Published baselines'|t}}</span>
+          </li>
+          <li>
+            <button (click)="go('decisions')">{{'Scenario Builder'|t}}</button
+            ><span>{{s.scenarios}} {{'Saved results'|t}}</span>
+          </li>
+          <li>
+            <button (click)="go('stress')">{{'Risk Center'|t}}</button
+            ><button (click)="go('briefs')">{{'Decision Briefs'|t}}</button
+            ><span>{{s.briefs}} {{'Saved briefs'|t}}</span>
+          </li>
+        </ol>
+        @if(!can('baseline.publish')){
+        <p>{{'An Owner or Manager must publish the baseline after preparation.'|t}}</p>
+        }}
+      </section>
+      } @if (active()!.kind === 'demo') {
+      <div class="demo-banner">
+        {{ "◈ Demo Mode — synthetic data only. Your demo is separate from company records." | t }}
+      </div>
+      } @if (tab() === 'stress'||tab()==='briefs') {@defer (on immediate) {
+      <stress-workbench
+        [records]="records"
+        (navigate)="journey($event)"
+        [workspace]="active()!"
+        [briefOnly]="tab()==='briefs'"
+      />
+      } @placeholder {
+      <p role="status">{{'Loading your workspace…'|t}}</p>
+      } @error {
+      <p role="alert">{{'Unable to load this page. Refresh to retry.'|t}}</p>
+      }} @if (tab() === 'forecasts') {@defer (on immediate) {
+      <forecast-workbench
+        [records]="records"
+        (navigate)="journey($event)"
+        [workspace]="active()!"
+        (usePlanning)="go('planning', $event)"
+      />
+      } @placeholder {
+      <p role="status">{{'Loading your workspace…'|t}}</p>
+      } @error {
+      <p role="alert">{{'Unable to load this page. Refresh to retry.'|t}}</p>
+      }} @if (tab() === 'decisions') {@defer (on immediate) {
+      <decision-workbench
+        [records]="records"
+        (navigate)="journey($event)"
+        [workspace]="active()!"
+      />
+      } @placeholder {
+      <p role="status">{{'Loading your workspace…'|t}}</p>
+      } @error {
+      <p role="alert">{{'Unable to load this page. Refresh to retry.'|t}}</p>
+      }} @if(tab()==='imports'){@defer (on immediate) {
+      <import-workbench
+        [records]="records"
+        (navigate)="journey($event)"
+        [workspace]="active()!"
+        (usePlanning)="go('planning', $event)"
+      />
+      } @placeholder {
+      <p role="status">{{'Loading your workspace…'|t}}</p>
+      } @error {
+      <p role="alert">{{'Unable to load this page. Refresh to retry.'|t}}</p>
+      }} @if (tab() === 'planning') {@defer (on immediate) {
+      <planning-workbench
+        [records]="records"
+        (navigate)="journey($event)"
+        [workspace]="active()!"
+      />
+      } @placeholder {
+      <p role="status">{{'Loading your workspace…'|t}}</p>
+      } @error {
+      <p role="alert">{{'Unable to load this page. Refresh to retry.'|t}}</p>
+      }} @if (tab() === 'overview') { @if(active()!.kind==='company'){
+      <div class="setup-resume">
+        <span>{{'Your planning workspace'|t}}</span
+        ><button (click)="go('setup')">
+          {{'Resume company setup'|t}} <span aria-hidden="true">↗</span>
+        </button>
+      </div>
+      }
+
+      <executive-overview [workspace]="active()!" (navigate)="journey($event)"
+        ><overview-activity [events]="events()"
+      /></executive-overview>
+      } @else if (tab() === 'members') {
+      <div class="eyebrow">{{ "WORKSPACE ADMINISTRATION" | t }}</div>
+      <h1>{{ "People & access" | t }}</h1>
+      <section class="card">
+        <h2>{{'Responsibilities'|t}}</h2>
+        <p>
+          {{'Owners manage access and policies. Analysts prepare and import data. Managers publish
+          baselines. All three roles can explore scenarios and prepare briefs.'|t}}
+        </p>
+      </section>
+      <p class="muted">
+        {{ "Analysts prepare information. Managers and Owners may publish the shared baseline." | t
+        }}
+      </p>
+      <section class="card">
+        <h2>{{ "Invite a teammate" | t }}</h2>
+        <form (ngSubmit)="invite()" class="inline-form">
+          <label>
+            {{ "Email" | t }}
+            <input name="inviteEmail" type="email" [(ngModel)]="inviteEmail" required /></label
+          ><label>
+            {{ "Role" | t }}
+            <select name="inviteRole" [(ngModel)]="inviteRole">
+              <option value="ANALYST">{{ "Analyst" | t }}</option>
+              <option value="MANAGER">{{ "Manager" | t }}</option>
+            </select></label
+          ><button class="primary" [disabled]="busy()">{{ "Create invitation" | t }}</button>
+        </form>
+        @if (inviteToken()) {
+        <label>
+          {{ "Private invitation token" | t }}
+          <textarea readonly rows="2">{{ inviteToken() }}</textarea>
+        </label>
+        }
+      </section>
+      <section class="card member-list">
+        @for (m of members(); track m.user_id) {
+        <div class="member">
+          <div><strong>{{ m.display_name }}</strong><small>{{ m.email }}</small></div>
+          <span class="pill">{{ m.role|t }}</span>@if (m.role !== 'OWNER') {<label
+            >{{'Role'|t}}<select #roleChoice [value]="m.role">
+              <option value="ANALYST">{{'Analyst'|t}}</option>
+              <option value="MANAGER">{{'Manager'|t}}</option>
+            </select></label
+          >
+          <button class="quiet" (click)="changeRole(m, roleChoice.value)" [disabled]="busy()">
+            {{ "Change role" | t }}</button
+          ><button class="quiet" (click)="transfer(m)" [disabled]="busy()">
+            {{ "Transfer ownership" | t }}</button
+          ><button class="danger-link" (click)="removeMember(m)" [disabled]="busy()">
+            {{ "Remove" | t }}
+          </button>
+          }
+        </div>
+        }
+      </section>
+      } @else if (tab() === 'settings') {
+      <div class="eyebrow">{{ "WORKSPACE ADMINISTRATION" | t }}</div>
+      <h1>{{ "Workspace settings" | t }}</h1>
+      <section class="card settings">
+        <form (ngSubmit)="saveSettings()">
+          <label>
+            {{ "Company name" | t }}
+            <input
+              name="editedName"
+              [(ngModel)]="editedName"
+              (ngModelChange)="navigation.dirty.set(true)"
+              required
+              maxlength="120" /></label
+          ><label>
+            {{ "Base currency" | t }} <input [value]="active()!.currency" disabled /><small>
+              {{ "Fixed for this workspace to preserve financial consistency." | t }}
+            </small></label
+          ><button class="primary" [disabled]="busy()">{{ "Save changes" | t }}</button>
+        </form>
+      </section>
+      <section class="card settings">
+        <h2>{{ "Archive workspace" | t }}</h2>
+        <p class="muted">
+          {{ "Records are retained, but archived workspaces cannot be opened." | t }}
+        </p>
+        <button class="danger-link" (click)="archive()" [disabled]="busy()">
+          {{ "Archive this workspace" | t }}
+        </button>
+      </section>
+      }
+    </main>
+  </div>
+  }
+  <footer>
+    {{ "Financial Decision Simulator" | t }}
+    <span> {{ "Financial planning, with context." | t }} </span>
+  </footer>
+</div>

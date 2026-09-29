@@ -1,0 +1,24 @@
+node_modules/
+dist/
+.angular/
+.env
+.env.*
+!.env.example
+.local/
+coverage/
+*.log
+__pycache__/
+*.pyc
+
+# Original external visual references; keep inventory and selected-screen manifest in docs.
+/design-reference/stitch/
+
+# Scratch PDF renders; retain final verification evidence in docs/ and output/.
+/tmp/
+# Private key material and database exports must never enter source control.
+*.pem
+*.key
+*.p12
+*.pfx
+*.sql.dump
+*.dump

@@ -1,0 +1,22 @@
+# Allow only build inputs; exclude local secrets, evidence and databases.
+**
+!Dockerfile
+!package.json
+!package-lock.json
+!angular.json
+!tsconfig.json
+!tsconfig.build.json
+!apps/
+!apps/**
+!packages/
+!packages/**
+!scripts/
+!scripts/migrate.ts
+!migrations/
+!migrations/**
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
+**/__pycache__
+**/*.pyc

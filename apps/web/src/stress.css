@@ -1,0 +1,177 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+fieldset {
+  border: 1px solid #d7e0d8;
+  border-radius: 12px;
+  padding: 20px;
+  margin: 20px 0;
+  min-width: 0;
+}
+legend {
+  font-weight: 700;
+}
+label {
+  display: block;
+  margin: 14px 0;
+}
+input[type='checkbox'] {
+  width: auto;
+  display: inline-block;
+  margin-right: 8px;
+}
+input,
+select,
+textarea {
+  max-width: 100%;
+  width: 100%;
+}
+.stress-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 16px;
+}
+.modification,
+.finding,
+.case-row {
+  border-bottom: 1px solid #d7e0d8;
+  padding: 12px 0;
+  overflow-wrap: anywhere;
+}
+.table-scroll {
+  overflow: auto;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+th,
+td {
+  padding: 8px;
+  text-align: left;
+  border-bottom: 1px solid #d7e0d8;
+}
+pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 500px;
+  overflow: auto;
+}
+small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.decision-brief {
+  background: white;
+  color: #142c25;
+  padding: 32px;
+  margin-top: 24px;
+  border: 1px solid #d7e0d8;
+  overflow-wrap: anywhere;
+}
+.decision-brief h1 {
+  font-size: 28px;
+}
+.decision-brief header {
+  display: block;
+  height: auto;
+  padding: 0 0 16px;
+}
+.decision-brief h2 {
+  font-size: 21px;
+}
+.decision-brief h3 {
+  font-size: 17px;
+}
+.decision-brief section {
+  margin: 22px 0;
+}
+.decision-brief table {
+  table-layout: fixed;
+}
+.decision-brief dd {
+  margin: 4px 0 14px;
+  font-weight: 600;
+}
+.decision-brief dt {
+  font-weight: 600;
+}
+.decision-brief small {
+  font-weight: 400;
+}
+.print-preview {
+  width: 100%;
+  max-width: 794px;
+  margin: 24px auto;
+  font:
+    12pt/1.45 Georgia,
+    serif;
+}
+.brief-option {
+  border-top: 1px solid #d7e0d8;
+  padding-top: 16px;
+}
+@media (max-width: 600px) {
+  fieldset,
+  .decision-brief {
+    padding: 16px;
+  }
+  .decision-brief h1 {
+    font-size: 24px;
+  }
+}
+@media print {
+  .brief-limitations {
+    break-inside: avoid;
+  }
+  .stress-workflow,
+  .brief-controls {
+    display: none !important;
+  }
+  .decision-brief {
+    display: block !important;
+    border: 0;
+    margin: 0;
+    padding: 0;
+    max-width: none;
+    width: auto;
+    font:
+      10pt/1.4 Georgia,
+      serif;
+    color: #000;
+  }
+  .decision-brief h1 {
+    font-size: 20pt;
+  }
+  .decision-brief h2 {
+    font-size: 15pt;
+    break-after: avoid;
+  }
+  .decision-brief h3 {
+    break-after: avoid;
+  }
+  .decision-brief header {
+    break-inside: avoid;
+  }
+  .decision-brief table {
+    table-layout: fixed;
+  }
+  .decision-brief tr,
+  .decision-brief dl {
+    break-inside: avoid;
+  }
+  .decision-brief thead {
+    display: table-header-group;
+  }
+  .decision-brief p {
+    orphans: 3;
+    widows: 3;
+  }
+  .decision-brief section {
+    overflow: visible;
+  }
+  .decision-brief .brief-option {
+    break-before: page;
+  }
+}

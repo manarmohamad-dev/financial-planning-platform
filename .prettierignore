@@ -1,0 +1,13 @@
+node_modules
+dist
+.angular
+.local
+package-lock.json
+.env
+
+.env.*
+!.env.example
+docs/evidence
+output
+tmp
+design-reference
