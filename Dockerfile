@@ -1,4 +1,4 @@
-# Build the existing Angular + Express application without runtime secrets.
+# Build only the existing Express API and Python runtime; no frontend deployment.
 FROM node:24-bookworm-slim AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
@@ -7,7 +7,7 @@ COPY angular.json tsconfig.json tsconfig.build.json ./
 COPY apps ./apps
 COPY packages ./packages
 COPY scripts/migrate.ts ./scripts/migrate.ts
-RUN npm run build
+RUN npm run build:api
 
 FROM node:24-bookworm-slim AS runtime
 RUN apt-get update && apt-get install -y --no-install-recommends python3 ca-certificates && rm -rf /var/lib/apt/lists/*
