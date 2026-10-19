@@ -1,8 +1,9 @@
+import { AiAssistance } from './ai-assistance.js';
 import { RecordHistory, WorkflowStages } from './ui';
 import { InPageLink } from './in-page';
 import { NavigationState, type Journey, type RecordContext } from './navigation';
 import { inject, HostListener, Output, EventEmitter } from '@angular/core';
-import { TranslatePipe, MoneyPipe } from './i18n';
+import { TranslatePipe, MoneyPipe } from './i18n.js';
 import { FinancialChart, FinancialMetric } from './ui';
 import { Component, Input, OnChanges, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -18,7 +19,7 @@ type Workspace = { id: string; kind: string; currency: string; permissions?: str
 @Component({
   selector: 'planning-workbench',
   standalone: true,
-  imports: [
+  imports: [AiAssistance,
     RecordHistory,
     WorkflowStages,
     InPageLink,

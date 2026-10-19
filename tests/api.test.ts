@@ -144,6 +144,7 @@ beforeAll(async () => {
     const directory = resolve('.local', `test-pg-${randomUUID()}`);
     await mkdir(directory, { recursive: true });
     embedded = new EmbeddedPostgres({
+      initdbFlags: ['--encoding=UTF8'],
       databaseDir: directory,
       user: 'postgres',
       password,
@@ -452,7 +453,7 @@ describe('versions, concurrency, invitations and audit', () => {
   it('has clean migrations and exact numeric support', async () => {
     expect(
       (await admin.query('SELECT name FROM schema_migrations ORDER BY name')).rows,
-    ).toHaveLength(8);
+    ).toHaveLength(9);
     expect(
       (await pool.query("SELECT '0.1'::numeric(24,6)+'0.2'::numeric(24,6) AS total")).rows[0].total,
     ).toBe('0.300000');
@@ -718,3 +719,54 @@ describe('M6 stress batches, deterministic risk and decision briefs',()=>{
  });});
 
 
+
+describe('M7 revised scope boundaries',()=>{
+ let owner:Client,manager:Client,analyst:Client,outsider:Client,w:string,b:string,legacy:string;
+ let calls=0,fail=false;
+ let started:()=>void=()=>{},release:()=>void=()=>{};let wait=false,gate=Promise.resolve();
+ beforeAll(async()=>{
+  app=await createApp(readConfig({NODE_ENV:'test',APP_ORIGIN:origin,DATABASE_URL:'postgresql://unused:unused@localhost/unused',SESSION_SECRET:randomBytes(48).toString('hex'),AI_ENABLED:'true',GROQ_API_KEY:'synthetic-test-only'}),pool,undefined,async()=>{
+   calls++;if(wait){started();await gate;}if(fail)throw new Error('private provider detail');
+   return {task:'assumption_review',payload:{claims:[{kind:'reported',ref:'f1'}]}};
+  });
+  owner=await client('revised-owner');manager=await client('revised-manager');analyst=await client('revised-analyst');outsider=await client('revised-outsider');w=await company(owner);
+  await join(owner,manager,w,'MANAGER');await join(owner,analyst,w,'ANALYST');
+  const p=`/workspaces/${w}/planning`;
+  const d=(await post(owner,p+'/drafts',syntheticFixture('new-company')).expect(201)).body.id;
+  const v=(await post(owner,p+`/drafts/${d}/confirm`,{revision:1}).expect(201)).body.id;
+  b=(await post(owner,p+'/baselines',{planningVersionId:v}).expect(201)).body.id;await post(owner,p+`/baselines/${b}/publish`).expect(200);
+  // Historical artifact fixture; never invokes the retired provider path.
+  const r=randomUUID();legacy=randomUUID();
+  await admin.query("INSERT INTO ai_requests(id,workspace_id,actor_id,idempotency_key,request_hash,source_hash,source_ref,task,locale,depth,status) VALUES($1,$2,$3,$4,'historical','historical',$5,'scenario_extract','en',0,'succeeded')",[r,w,owner.id,randomUUID(),{kind:'published_baseline',id:b,revision:null}]);
+  const output={schemaVersion:'m7-1',task:'scenario_extract',outcome:'needs_clarification',summary:'Please specify salary and timing.',questions:[{id:'salary',field:'salary',question:'What salary?',reason:'Required input'}],warnings:[],payload:{title:null,decisionType:'hiring',changes:[],expansion:null,paybackRequested:null}};
+  await admin.query("INSERT INTO ai_artifacts(id,workspace_id,request_id,output,evidence,input_chain,model,schema_version,prompt_version) VALUES($1,$2,$3,$4,$5,$6,'historical','m7-1','historical')",[legacy,w,r,output,{facts:{},entries:{},scopes:{},currency:'EGP'},{text:'Hire someone.',answers:[]}]);
+ });
+ const input=(task='assumption_review')=>({task,locale:'en',source:{kind:'published_baseline',id:b,revision:null},text:'Review saved assumptions.',priorArtifactId:null,answers:[],consentVersion:'groq-minimal-context-1',idempotencyKey:randomUUID()});
+ it('requires authentication',async()=>{await request(app).get(`/api/v1/workspaces/${w}/ai/capabilities`).expect(401);});
+ it('advertises only supported generation tasks',async()=>{const r=await owner.agent.get(`/api/v1/workspaces/${w}/ai/capabilities`).expect(200);expect(r.body.tasks).toEqual(['assumption_review','result_explain','brief_narrative']);expect(r.body.freeTextExtraction).toBe(false);});
+ for(const endpoint of ['requests','context'])it(`retires extraction and continuation at ${endpoint} without provider or artifacts`,async()=>{
+  const before=calls;const count=(await admin.query('SELECT count(*) FROM ai_artifacts')).rows;
+  for(const priorArtifactId of [null,legacy]){const r=await post(owner,`/workspaces/${w}/ai/${endpoint}`,{...input('scenario_extract'),priorArtifactId}).expect(410);expect(r.body.error.code).toBe('AI_EXTRACTION_RETIRED');}
+  expect(calls).toBe(before);expect((await admin.query('SELECT count(*) FROM ai_artifacts')).rows).toEqual(count);
+ });
+ it('preserves authorized historical reads and listing for all roles',async()=>{const before=calls;for(const c of [owner,manager,analyst]){await c.agent.get(`/api/v1/workspaces/${w}/ai/artifacts/${legacy}`).expect(200);const r=await c.agent.get(`/api/v1/workspaces/${w}/ai/artifacts?sourceId=${b}&task=scenario_extract`).expect(200);expect(r.body.artifacts[0].id).toBe(legacy);}expect(calls).toBe(before);});
+ it('hides history and new assistance from foreign tenants',async()=>{const before=calls;await outsider.agent.get(`/api/v1/workspaces/${w}/ai/artifacts/${legacy}`).expect(404);await post(outsider,`/workspaces/${w}/ai/requests`,input()).expect(404);expect(calls).toBe(before);});
+ it('preserves immutable historical artifacts and RLS',async()=>{await expect(transaction(pool,owner.id,w,db=>db.query('UPDATE ai_artifacts SET output=$1 WHERE id=$2',[{},legacy]))).rejects.toThrow();const rows=await transaction(pool,outsider.id,w,db=>db.query('SELECT id FROM ai_artifacts WHERE id=$1',[legacy]));expect(rows.rowCount).toBe(0);});
+ it('generates grounded review for all roles without financial mutation',async()=>{const before=(await admin.query('SELECT count(*) FROM scenario_drafts WHERE workspace_id=$1',[w])).rows;for(const c of [owner,manager,analyst]){const r=await post(c,`/workspaces/${w}/ai/requests`,input()).expect(201);expect(r.body.proposal).toBeNull();}expect((await admin.query('SELECT count(*) FROM scenario_drafts WHERE workspace_id=$1',[w])).rows).toEqual(before);});
+ it('reuses saved assistance idempotently',async()=>{const value=input();const a=await post(manager,`/workspaces/${w}/ai/requests`,value).expect(201);const before=calls;const again=await post(manager,`/workspaces/${w}/ai/requests`,value).expect(201);expect(again.body.id).toBe(a.body.id);expect(calls).toBe(before);await post(manager,`/workspaces/${w}/ai/requests`,{...value,text:'Changed'}).expect(409);});
+ it('sanitizes unavailable provider and preserves manual access',async()=>{fail=true;try{const r=await post(analyst,`/workspaces/${w}/ai/requests`,input()).expect(503);expect(JSON.stringify(r.body)).not.toContain('private provider detail');await analyst.agent.get(`/api/v1/workspaces/${w}/planning/baselines`).expect(200);}finally{fail=false;}});
+ it('reopens Arabic review without a new provider request',async()=>{const r=await post(owner,`/workspaces/${w}/ai/requests`,{...input(),locale:'ar'}).expect(201);const before=calls;const saved=await owner.agent.get(`/api/v1/workspaces/${w}/ai/artifacts/${r.body.id}`).expect(200);expect(saved.body.output.summary).toBe('شرح الأدلة');expect(calls).toBe(before);});
+ it('does not apply a historical clarification artifact',async()=>{await post(owner,`/workspaces/${w}/ai/artifacts/${legacy}/apply`,{reviewed:false,document:{}}).expect(400);});
+ it('discards inference after membership revocation without holding a transaction',async()=>{
+  const c=await client('revised-inflight');await join(owner,c,w,'ANALYST');wait=true;
+  gate=new Promise<void>(r=>release=r);const entered=new Promise<void>(r=>started=r);
+  const pending=post(c,`/workspaces/${w}/ai/requests`,input()).then(r=>r);
+  await entered;
+  expect((await admin.query("SELECT count(*) FROM pg_stat_activity WHERE usename='planner_app' AND state='idle in transaction'")).rows[0].count).toBe('0');
+  await admin.query('DELETE FROM memberships WHERE workspace_id=$1 AND user_id=$2',[w,c.id]);release();
+  const result=await pending;wait=false;expect([403,404]).toContain(result.status);
+  expect((await admin.query('SELECT count(*) FROM ai_artifacts a JOIN ai_requests r ON a.request_id=r.id WHERE r.actor_id=$1',[c.id])).rows[0].count).toBe('0');
+ });
+ it('blocks archived workspace before provider call',async()=>{const before=calls;await admin.query("UPDATE workspaces SET status='archived' WHERE id=$1",[w]);await post(owner,`/workspaces/${w}/ai/requests`,input()).expect(409);expect(calls).toBe(before);});
+
+});

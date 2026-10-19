@@ -16,7 +16,7 @@ import { MoneyPipe, TranslatePipe, LocalDatePipe } from './i18n.js';
         ><strong>{{ label | t }}</strong>
       </li>
     }
-  </ol>`,
+  </ol><p class="workflow-progress-note">{{ 'Progress indicator — use the actions below to continue.' | t }}</p>`,
 })
 export class WorkflowStages {
   @Input() labels: string[] = [];

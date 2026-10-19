@@ -12,7 +12,34 @@
     </p>
   </div>
 </div>
-@if(result();as summary){
+<nav class="workflow-contents" [attr.aria-label]="'Scenario shortcuts' | t"><a inPage href="#scenario-comparisons">{{ 'Compare saved scenarios' | t }} ({{runs().length}})</a><a inPage href="#scenario-history">{{ 'Saved work & history' | t }}</a></nav>
+@if (can('scenario.edit') && baseline()) {
+<section class="card" aria-labelledby="guided-decision-title">
+  <h2 id="guided-decision-title">{{ 'Guided scenario entry' | t }}</h2>
+  <p>{{ 'Choose a decision type, enter its financial inputs, then review and confirm before calculating.' | t }}</p>
+  <div class="actions" role="group" [attr.aria-label]="'Decision type' | t">
+    @for (type of guidedTypes; track type) {
+    <button [disabled]="busy()" (click)="startGuidedEntry(type)">{{ text(type) | t }}</button>
+    }
+  </div>
+  <p class="muted">{{ 'For a decision with several parts, choose combined and add each change. Your existing draft is preserved.' | t }}</p>
+</section>
+}
+@if (workspace.permissions?.includes('ai.use') && document.baselineVersionId) {
+<ai-assistance
+  [workspaceId]="workspace.id"
+  [source]="{kind:'published_baseline',id:document.baselineVersionId,revision:null}"
+  task="scenario_extract"
+  [historyOnly]="true"
+  (applied)="navigate.emit({page:'decisions',records:{draft:$event}})"
+/>
+} @if (workspace.permissions?.includes('ai.use') && runId) {
+<ai-assistance
+  [workspaceId]="workspace.id"
+  [source]="{kind:'scenario_run',id:runId,revision:null}"
+  task="result_explain"
+/>
+} @if(result();as summary){
 <section class="summary-metrics" [attr.aria-label]="'Decision impact'|t">
   <ui-metric
     label="Scenario minimum cash"
@@ -218,7 +245,7 @@
     </div>
   </div>
 </div>
-@if(workspace.kind!=='demo'){
+@if((workspace.kind!=='demo' || guidedEntry)){
 <nav class="workflow-contents" [attr.aria-label]="'On this page'|t">
   <a inPage href="#scenario-baseline">{{"1. Choose your baseline"|t}}</a
   ><a inPage href="#scenario-decision">{{"2. Describe your decision"|t}}</a
@@ -230,10 +257,10 @@
 <p class="notice" role="status">{{ (notice()) | t }}</p>
 } @if(busy()){
 <p role="status">{{ "Working…" | t }}</p>
-} @if(workspace.kind!=='demo'){ @if(baseline()){
+} @if((workspace.kind!=='demo' || guidedEntry)){ @if(baseline()){
 <details class="card workbench-editor" [open]="!result()">
   <summary>{{'Edit and review'|t}}</summary>
-  <h2 id="scenario-decision">{{ "2. Describe your decision" | t }}</h2>
+  <h2 id="scenario-decision" tabindex="-1">{{ "2. Describe your decision" | t }}</h2>
   <fieldset [disabled]="busy() || !can('scenario.edit')" (change)="changed()">
     <div class="input-grid">
       <label>
@@ -546,11 +573,13 @@
     <button
       class="primary"
       [disabled]="busy()||!approved||!report()?.executable||!can('scenario.edit')"
+      aria-describedby="scenario-confirm-help"
       (click)="confirm()"
     >
-      {{ "Confirm immutable version" | t }}
+      {{ "Confirm reviewed scenario" | t }}
     </button>
   </div>
+  <p id="scenario-confirm-help" class="action-hint" role="status">{{ (busy() ? 'Please wait…' : !can('scenario.edit') ? 'Your role cannot confirm scenario inputs.' : !report()?.executable ? 'Check readiness and resolve the required inputs before confirming.' : !approved ? 'Select the review checkbox to confirm this scenario.' : 'Ready to confirm. Confirmation preserves this reviewed version.') | t }}</p>
   @if(versionId){
   <p>{{ "Confirmed scenario version: {0}" | t:[(versionId)] }}</p>
   <button class="primary" [disabled]="busy()||!can('scenario.run')" (click)="run()">
@@ -562,7 +591,7 @@
   class="card workbench-history"
   [open]="!result() && (!!records.draft || !!records.run || !!records.dataset || !!records.file || !!records.comparison)"
 >
-  <summary>{{ "Saved work & history" | t }}</summary>
+  <summary id="scenario-history">{{ "Saved work & history" | t }}</summary>
   <div class="input-grid">
     <label>
       {{ "Drafts" | t }}
@@ -592,7 +621,7 @@
       </select></label
     >
   </div>
-  @if(workspace.kind!=='demo'){<label>
+  @if((workspace.kind!=='demo' || guidedEntry)){<label>
     {{ "Confirmed version to run" | t }}
     <select [(ngModel)]="versionId">
       <option value="">{{ "Select immutable version" | t }}</option>
@@ -785,7 +814,8 @@
 </section>
 }
 <section class="card planning-section">
-  <h2>{{ "Compare alternatives A / B / C" | t }}</h2>
+  <h2 id="scenario-comparisons" tabindex="-1">{{ "Compare alternatives A / B / C" | t }}</h2>
+  @if(!runs().length){<p class="action-hint">{{ 'Calculate and save a scenario first. Its result will appear here for comparison.' | t }}</p>}
   <p>
     {{ "Select up to three saved runs against the same baseline and financial policy. The platform
     does not rank alternatives." | t }}
@@ -804,10 +834,12 @@
   <div class="actions">
     <button
       [disabled]="busy()||!selected.length||!can('comparison.view')"
+      aria-describedby="scenario-comparison-help"
       (click)="saveComparison()"
     >
       {{ "Save comparison" | t }}
     </button>
+    <p id="scenario-comparison-help" class="action-hint">{{ (!can('comparison.view') ? 'Your role cannot compare saved results.' : !selected.length ? 'Select saved results below the same baseline to enable comparison.' : 'The selected saved results will be compared without ranking a preferred decision.') | t }}</p>
   </div>
   <label>
     {{ "Saved comparisons" | t }}

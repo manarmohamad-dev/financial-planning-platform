@@ -4,6 +4,9 @@ export type Locale = 'en' | 'ar';
 export function translate(value: string, locale: Locale, params: unknown[] = []): string {
   const key = value.replace(/\s+/g, ' ').trim();
   if (locale === 'ar' && !AR[key]) {
+    const parsing = key.match(/^Parsing rejected: (.+)\. Use a supported values-only file within the documented limits\.$/);
+    if (parsing)
+      return translate('Parsing rejected: {0}. Use a supported values-only file within the documented limits.', locale, [parsing[1]]);
     const risk = key.match(
       /^(Projected closing cash|Operating result) is below the declared ([A-Z]{3}) (-?[\d.]+) threshold from (\d{4}-\d{2}) through (\d{4}-\d{2})\.$/,
     );

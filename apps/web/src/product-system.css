@@ -1164,6 +1164,7 @@
   .density-import-detail {
     margin-block: 16px;
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 14px;
   }
   .density-lower {
@@ -1266,3 +1267,10 @@
     text-align: end;
   }
 }
+
+/* P0: workflow guidance, without changing action eligibility. */
+.workflow-progress-note { margin: -4px 0 18px; color: #526579; font-size: .85rem; }
+.action-hint { color: #40566b; font-size: .9rem; line-height: 1.6; margin-block: 10px; max-width: 75ch; overflow-wrap: anywhere; }
+.setup-next { padding: 20px; margin-block: 18px; background: #edf3f7; border-inline-start: 3px solid #126c72; border-radius: 8px; }
+.setup-next button { margin-inline-end: 10px; margin-block-start: 10px; }
+@media print { .workflow-progress-note, .action-hint, .setup-next { display: none !important; } }

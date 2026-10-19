@@ -1,4 +1,5 @@
 import { InPageLink } from './in-page';
+import { PublicLanding } from './landing';
 import {
   NavigationEnd,
   Router,
@@ -50,6 +51,7 @@ type AuditEvent = {
   selector: 'app-root',
   standalone: true,
   imports: [
+    PublicLanding,
     InPageLink,
     RouterOutlet,
     TranslatePipe,
@@ -65,6 +67,7 @@ type AuditEvent = {
   templateUrl: './app.html',
 })
 class App {
+  landing = signal(window.location.pathname === '/');
   readonly navigation = inject(NavigationState);
   readonly router = inject(Router);
   records: RecordContext = {};
@@ -90,6 +93,7 @@ class App {
     void this.router.navigate([this.registering ? '/sign-in' : '/sign-up']);
   }
   async restoreRoute() {
+    this.landing.set(this.router.url.split(/[?#]/)[0] === '/');
     if (!this.loaded()) return;
     const generation = ++this.routeGeneration;
     const tree = this.router.parseUrl(this.router.url);
@@ -167,7 +171,7 @@ class App {
             briefs: briefs.briefs.length,
           });
         }
-      } else if (!['workspaces', 'account', 'sign-in', 'sign-up'].includes(segments[0])) {
+      } else if (segments.length && !['workspaces', 'account', 'sign-in', 'sign-up'].includes(segments[0])) {
         throw new Error('Page not found. Choose a workspace to continue.');
       }
     } catch (e) {

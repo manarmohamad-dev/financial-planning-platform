@@ -181,6 +181,7 @@
       ><button (click)="check()" [disabled]="!reviewed||!component||!origin">
         {{ "Check forecast eligibility" | t }}
       </button>
+      @if(!reviewed||!component||!origin){<p class="action-hint">{{ 'Choose the financial series and forecast start, then confirm the monthly-history review to check eligibility.' | t }}</p>}
     </fieldset>
     @if(evidence();as e){
     <section>

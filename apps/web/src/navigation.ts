@@ -103,7 +103,8 @@ const leaveGuard: CanActivateFn = () => inject(NavigationState).allowLeave();
 @Component({ standalone: true, template: '' })
 export class RouteAnchor {}
 export const routes: Routes = [
-  { path: '', pathMatch: 'full', redirectTo: 'workspaces' },
+  { path: '', pathMatch: 'full', component: RouteAnchor, canActivate: [leaveGuard] },
+  { path: 'workspaces/:workspaceId/account', redirectTo: '/account', pathMatch: 'full' },
   ...['workspaces', 'account', 'sign-in', 'sign-up', 'workspaces/:workspaceId/:page'].map(
     (path) => ({
       path,

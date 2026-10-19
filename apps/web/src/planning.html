@@ -12,7 +12,14 @@
   </div>
   <span class="badge"> {{ "{0} · Monthly" | t:[(workspace.currency)] }} </span>
 </div>
-@if(workspace.kind!=='demo'){
+@if (workspace.permissions?.includes('ai.use') && workspace.permissions?.includes('baseline.edit')
+&& baselineId) {
+<ai-assistance
+  [workspaceId]="workspace.id"
+  [source]="{kind:'published_baseline',id:baselineId,revision:null}"
+  task="assumption_review"
+/>
+} @if(workspace.kind!=='demo'){
 <nav class="workflow-contents" [attr.aria-label]="'On this page'|t">
   <a inPage href="#baseline-inputs">{{"1. Company data"|t}}</a
   ><a inPage href="#baseline-versions">{{"2. Baseline versions"|t}}</a
@@ -593,6 +600,7 @@
     </div>
   </div>
   <small> {{ "Owners and Managers publish. Analysts may prepare and calculate." | t }} </small>
+  @if(!baselineId){<p class="action-hint">{{ 'Choose a prepared baseline above before publishing or calculating.' | t }}</p>}
 </details>
 <details class="card evidence-disclosure" [open]="!result()">
   <summary>{{ "Declared cash reserve" | t }}</summary>

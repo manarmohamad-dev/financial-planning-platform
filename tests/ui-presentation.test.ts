@@ -7,6 +7,12 @@ import { EN } from '../apps/web/src/locales/en.js';
 import { FinancialPath } from '../apps/web/src/chart-model.js';
 
 describe('Presentation localization and financial integrity', () => {
+  it('localizes rejected imports while preserving the technical reason and English message', () => {
+    const message = 'Parsing rejected: XLSX_INVALID. Use a supported values-only file within the documented limits.';
+    expect(translate(message, 'en')).toBe(message);
+    expect(translate('Too many requests', 'ar')).toBe('طلبات كثيرة خلال وقت قصير. انتظري قليلًا ثم حاولي مرة أخرى.');
+    expect(translate(message, 'ar')).toBe('تعذرت قراءة الملف: \u2068XLSX_INVALID\u2069. استخدمي ملفًا مدعومًا يحتوي على قيم فقط وضمن الحدود الموضحة.');
+  });
   it('covers the English catalogue and preserves every interpolation slot', () => {
     for (const key of EN) {
       expect(AR[key], key).toBeTruthy();

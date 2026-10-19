@@ -958,3 +958,12 @@ import-workbench button:disabled {
     display: none !important;
   }
 }
+
+@media print {
+  body:has(stress-workbench .decision-brief) .workspace-main > .evidence-strip {
+    display: none !important;
+  }
+  body:has(stress-workbench .decision-brief) .workspace-main {
+    outline: none !important;
+  }
+}

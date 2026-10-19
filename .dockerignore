@@ -18,5 +18,12 @@
 **/.env.*
 **/*.pem
 **/*.key
+**/*.p12
+**/*.pfx
+**/*.dump
+**/*.sql.dump
+**/node_modules
+**/.git
+**/.local
 **/__pycache__
 **/*.pyc

@@ -21,6 +21,13 @@
               "apps/web/src/premium.css",
               "apps/web/src/product-system.css",
               "apps/web/src/overview-prototype.css"
+            ],
+            "assets": [
+              {
+                "glob": "**/*",
+                "input": "apps/web/public",
+                "output": "/"
+              }
             ]
           },
           "configurations": {

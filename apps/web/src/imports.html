@@ -641,6 +641,7 @@
       >
         {{ "Confirm mapping version" | t }}
       </button>
+      @if(!reviewed||!can('mapping.review')){<p class="action-hint">{{ (!can('mapping.review')?'Your role cannot confirm mapping. Ask a workspace reviewer.':'Review the mapping and select its confirmation checkbox to continue.')|t }}</p>}
       <details>
         <summary>{{ "Reuse a workspace mapping template" | t }}</summary>
         <p>
@@ -664,7 +665,7 @@
     <section class="card planning-section">
       <h2>{{ "4. Validation and capabilities" | t }}</h2>
       @for(level of ['blocker','warning','information'];track level){
-      <h3>{{ "{0}s" | t:[(text(level))] }}</h3>
+      <h3>{{ (level==='blocker'?'Blocking issues':level==='warning'?'Warnings':'Information') | t }}</h3>
       @for(issue of r.issues;track $index){@if(issue.severity===level){
       <p class="finding">
         <strong>{{issue.code}}</strong> {{issue.message|t}} @if(issue.row){<small>
@@ -675,12 +676,12 @@
       <h3>{{ "Capability report" | t }}</h3>
       <p>
         {{ "Execution: {0}. Evidence quality: {1}." | t:[(r.canConfirm?'Ready to confirm after
-        warnings are reviewed':'Needs input'),(r.evidenceQuality)] }}
+        warnings are reviewed':'Needs input')|t,(r.evidenceQuality|t)] }}
       </p>
       @for(c of r.capabilities?.capabilities;track c.capability){
       <p><strong>{{ (text(c.capability)) | t }}</strong> {{ (text(c.readiness)) | t }}</p>
       }@for(c of r.scenarioCapabilities;track c.name){
-      <p><strong>{{c.name}}:</strong> {{(text(c.readiness))|t}} — {{c.reason|t}}</p>
+      <p><strong>{{c.name|t}}:</strong> {{(text(c.readiness))|t}} — {{c.reason|t}}</p>
       }
       <details>
         <summary>{{ "Normalized financial inputs and source rows" | t }}</summary>
@@ -707,7 +708,7 @@
     </section>
     } @if(planningVersionId){
     <section class="card planning-section">
-      <h2>{{ "Dataset ready for the existing engines" | t }}</h2>
+      <h2>{{ "Your reviewed data is ready for baseline planning" | t }}</h2>
       <p>
         {{ "Planning version {0}. Open Data &amp; baseline, choose this confirmed version and
         prepare/publish its baseline. Decisions then use that exact published baseline." |

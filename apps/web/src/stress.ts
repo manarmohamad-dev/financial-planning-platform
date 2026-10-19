@@ -1,3 +1,4 @@
+import { AiAssistance } from './ai-assistance.js';
 import { RecordHistory, WorkflowStages, FinancialChart } from './ui.js';
 import { NavigationState, type Journey, type RecordContext } from './navigation.js';
 import { inject, HostListener, Output, EventEmitter } from '@angular/core';
@@ -31,7 +32,7 @@ type Batch = {
 @Component({
   selector: 'stress-workbench',
   standalone: true,
-  imports: [
+  imports: [AiAssistance,
     RecordHistory,
     WorkflowStages,
     FinancialChart,

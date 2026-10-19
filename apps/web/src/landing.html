@@ -1,0 +1,240 @@
+<a inPage class="skip-link" href="#landing-main">{{ 'Skip to content' | t }}</a>
+<header class="public-header">
+  <a class="identity" routerLink="/" [attr.aria-label]="'Financial Decision Simulator home' | t"
+    ><span class="identity-mark" aria-hidden="true">↗</span
+    ><span
+      >{{ 'Financial Decision Simulator' | t }}<small
+        >{{ 'FOR SMALL & MEDIUM BUSINESSES' | t }}</small
+      ></span
+    ></a
+  >
+  <nav [attr.aria-label]="'Product navigation' | t">
+    <a inPage href="#how-it-works">{{ 'How it works' | t }}</a
+    ><a inPage href="#decisions">{{ 'Your decisions' | t }}</a
+    ><a inPage href="#ai-role">{{ 'AI, explained' | t }}</a>
+  </nav>
+  <div class="public-controls">
+    <div class="language" role="group" [attr.aria-label]="'Language' | t">
+      <button (click)="locale.set('en')" [attr.aria-pressed]="locale.locale()==='en'">EN</button
+      ><button (click)="locale.set('ar')" [attr.aria-pressed]="locale.locale()==='ar'">
+        العربية
+      </button>
+    </div>
+    <a routerLink="/sign-in" class="sign-in">{{ 'Sign in' | t }}</a>
+  </div>
+</header>
+<main id="landing-main" tabindex="-1">
+  <section class="hero public-section">
+    <div class="hero-copy">
+      <p class="eyebrow">{{ 'PLAN WITH EVIDENCE. DECIDE WITH CONTEXT.' | t }}</p>
+      <h1>{{ 'See what your next decision means for cash.' | t }}</h1>
+      <p class="hero-description">
+        {{ 'Explore sales, hiring, expenses and expansion before committing. Compare your options
+        against a reviewed financial baseline, with clear results and traceable evidence.' | t }}
+      </p>
+      <div class="cta-row">
+        <a class="cta primary-cta" [routerLink]="signedIn ? '/workspaces' : '/sign-up'"
+          >{{ (signedIn ? 'Open your workspace' : 'Get started') | t }}
+          <span aria-hidden="true">↗</span></a
+        ><a class="cta secondary-cta" inPage href="#product-preview"
+          >{{ 'See the product' | t }} <span aria-hidden="true">↓</span></a
+        >
+      </div>
+      <p class="hero-note">
+        {{ 'For SME owners, managers and analysts. You review the inputs. You make the decision.' |
+        t }}
+      </p>
+    </div>
+    <aside class="hero-principle">
+      <span class="principle-icon" aria-hidden="true">↗</span>
+      <p class="eyebrow">{{ 'BEFORE YOU COMMIT' | t }}</p>
+      <h2>{{ 'A decision is more than a profit figure.' | t }}</h2>
+      <p>
+        {{ 'Understand the timing of money in and out, compare alternatives, and see which
+        assumptions need your attention.' | t }}
+      </p>
+      <ul>
+        <li>{{ 'A reviewed starting point' | t }}</li>
+        <li>{{ 'Comparable financial outcomes' | t }}</li>
+        <li>{{ 'Evidence behind the explanation' | t }}</li>
+      </ul>
+    </aside>
+  </section>
+  <figure id="product-preview" class="product-preview public-section">
+    <div class="preview-bar">
+      <span class="preview-dot" aria-hidden="true"></span
+      ><strong>{{ 'Inside the application' | t }}</strong
+      ><span>{{ 'Synthetic demonstration data' | t }}</span>
+    </div>
+    <p class="preview-mobile-help" id="preview-help">
+      {{ 'Swipe to explore the dashboard. Tap to open the full image.' | t }}
+    </p>
+    <div
+      class="preview-viewport"
+      tabindex="0"
+      role="region"
+      [attr.aria-label]="'Dashboard screenshot preview' | t"
+    >
+      <a
+        [href]="'/assets/product/overview-'+locale.locale()+'.png'"
+        target="_blank"
+        rel="noopener"
+        [attr.aria-label]="'Open full-size product screenshot in a new tab' | t"
+        ><img
+          [src]="'/assets/product/overview-'+locale.locale()+'.png'"
+          width="1440"
+          height="1000"
+          [alt]="'Actual Executive Overview showing synthetic financial data and its cash trajectory' | t"
+          fetchpriority="high"
+      /></a>
+    </div>
+    <figcaption>
+      {{ 'Actual application screen. Illustrative synthetic data, not a prediction or a promise of
+      results.' | t }}
+    </figcaption>
+  </figure>
+  <section id="how-it-works" class="public-section workflow-section">
+    <div class="section-heading">
+      <p class="eyebrow">{{ 'FROM INPUTS TO A CLEARER DECISION' | t }}</p>
+      <h2>{{ 'Three steps. One traceable financial story.' | t }}</h2>
+    </div>
+    <div class="three-grid">
+      <article>
+        <span class="step-number">01</span>
+        <h3>{{ 'Review your starting point' | t }}</h3>
+        <p>
+          {{ 'Import CSV or Excel, review the mapping, or enter explicit assumptions and schedules.
+          Confirm the baseline you want to use.' | t }}
+        </p>
+      </article>
+      <article>
+        <span class="step-number">02</span>
+        <h3>{{ 'Explore a decision' | t }}</h3>
+        <p>
+          {{ 'Use guided inputs to describe a supported change. Review and confirm it before the
+          financial engine calculates the scenario.' | t }}
+        </p>
+      </article>
+      <article>
+        <span class="step-number">03</span>
+        <h3>{{ 'Compare and explain' | t }}</h3>
+        <p>
+          {{ 'Compare saved results, inspect risk findings and prepare a decision brief with its
+          sources, assumptions and limitations.' | t }}
+        </p>
+      </article>
+    </div>
+  </section>
+  <section id="decisions" class="public-section decisions-section">
+    <div class="section-heading">
+      <p class="eyebrow">{{ 'BUILT AROUND REAL BUSINESS QUESTIONS' | t }}</p>
+      <h2>{{ 'Four decisions. A shared financial foundation.' | t }}</h2>
+      <p>
+        {{ 'Combine supported changes when a decision has several parts. Missing information stays
+        missing until you supply it.' | t }}
+      </p>
+    </div>
+    <div class="decision-grid">
+      @for(item of decisions; track item[0]){
+      <article>
+        <span class="decision-number">{{item[0]}}</span>
+        <h3>{{item[1]|t}}</h3>
+        <p>{{item[2]|t}}</p>
+      </article>
+      }
+    </div>
+  </section>
+  <section class="public-section evidence-section">
+    <div class="section-heading">
+      <p class="eyebrow">{{ 'MORE THAN A DASHBOARD' | t }}</p>
+      <h2>{{ 'Follow the evidence all the way through.' | t }}</h2>
+    </div>
+    <div class="three-grid">
+      <article>
+        <h3>{{ 'Forecast when the history supports it' | t }}</h3>
+        <p>
+          {{ 'Statistical forecasting checks historical evidence first. It is optional: reviewed
+          assumptions and known schedules can still support your baseline.' | t }}
+        </p>
+      </article>
+      <article>
+        <h3>{{ 'Understand risk in context' | t }}</h3>
+        <p>
+          {{ 'Review stress cases against declared limits. Inspect the actual findings without
+          treating unknown information as zero.' | t }}
+        </p>
+      </article>
+      <article>
+        <h3>{{ 'Take the reasoning with you' | t }}</h3>
+        <p>
+          {{ 'Create a Decision Brief and print or save it as PDF, with source references,
+          assumptions and limitations.' | t }}
+        </p>
+      </article>
+    </div>
+  </section>
+  <section id="ai-role" class="public-section ai-section">
+    <div>
+      <p class="eyebrow">{{ 'AI ASSISTANCE, WITH BOUNDARIES' | t }}</p>
+      <h2>{{ 'An explanation you can check.' | t }}</h2>
+      <p>
+        {{ 'AI reviews recorded assumptions and helps explain saved scenario results, risk findings
+        and decision briefs using available evidence.' | t }}
+      </p>
+    </div>
+    <div class="ai-boundaries">
+      <p>{{ 'The financial engine calculates. AI assists with explanation. You decide.' | t }}</p>
+      <ul>
+        <li>
+          {{ 'No autonomous financial decisions or AI-generated financial calculations.' | t }}
+        </li>
+        <li>
+          {{ 'Scenario creation uses reviewed guided inputs, not free-text AI extraction.' | t }}
+        </li>
+        <li>
+          {{ 'Review the outgoing context before consenting to AI assistance. Manual tools remain
+          available if AI is unavailable.' | t }}
+        </li>
+      </ul>
+    </div>
+  </section>
+  <section class="public-section faq-section">
+    <h2>{{ 'Before you get started' | t }}</h2>
+    <details>
+      <summary>{{ 'Do I need historical data?' | t }}</summary>
+      <p>
+        {{ 'Historical data is needed for statistical forecasting. You can otherwise plan with
+        reviewed assumptions and explicit schedules.' | t }}
+      </p>
+    </details>
+    <details>
+      <summary>{{ 'Is this an accounting system?' | t }}</summary>
+      <p>
+        {{ 'This product supports financial planning and decision comparison. It does not replace
+        your accounting records or make decisions for you.' | t }}
+      </p>
+    </details>
+    <details>
+      <summary>{{ 'Can I explore a demo?' | t }}</summary>
+      <p>
+        {{ 'After signing in, choose your personal demo for synthetic examples. Company workspaces
+        remain separate.' | t }}
+      </p>
+    </details>
+  </section>
+  <section class="public-section closing-cta">
+    <div>
+      <p class="eyebrow">{{ 'YOUR NEXT DECISION, IN CONTEXT' | t }}</p>
+      <h2>{{ 'Start with a clearer view.' | t }}</h2>
+    </div>
+    <a class="cta primary-cta" [routerLink]="signedIn ? '/workspaces' : '/sign-up'"
+      >{{ (signedIn ? 'Open your workspace' : 'Get started') | t }}
+      <span aria-hidden="true">↗</span></a
+    >
+  </section>
+</main>
+<footer class="public-footer">
+  <strong>{{ 'Financial Decision Simulator' | t }}</strong
+  ><span>{{ 'Financial planning, with context.' | t }}</span
+  ><a routerLink="/sign-in">{{ 'Sign in' | t }}</a>
+</footer>

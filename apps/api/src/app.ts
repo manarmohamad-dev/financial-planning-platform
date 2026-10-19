@@ -1,4 +1,6 @@
 import { existsSync } from 'node:fs';
+import { aiRoutes } from './ai-routes.js';
+import { createGroqProvider, type AiProvider } from './ai-provider.js';
 import { resolve } from 'node:path';
 import { stressRoutes } from './stress-routes.js';
 import { forecastRoutes } from './forecast-routes.js';
@@ -62,7 +64,7 @@ const requireUser = (req: Request) => {
 };
 const rid = (res: Response): string => res.locals.requestId;
 
-export async function createApp(config: Config, pool: Pool, forecastRunner?: ForecastRunner) {
+export async function createApp(config: Config, pool: Pool, forecastRunner?: ForecastRunner, aiProvider?: AiProvider) {
   const databaseRole = (
     await pool.query(
       "SELECT r.rolsuper,r.rolbypassrls,EXISTS(SELECT 1 FROM pg_tables WHERE schemaname='public' AND tablename='workspaces' AND tableowner=current_user) AS owns_business_tables FROM pg_roles r WHERE r.rolname=current_user",
@@ -627,6 +629,7 @@ export async function createApp(config: Config, pool: Pool, forecastRunner?: For
   );
   app.use('/api/v1/workspaces/:workspaceId/imports', importRoutes(pool));
   app.use('/api/v1/workspaces/:workspaceId/stress', stressRoutes(pool));
+  app.use('/api/v1/workspaces/:workspaceId/ai', aiRoutes(pool, aiProvider ?? createGroqProvider({enabled:config.AI_ENABLED,key:config.GROQ_API_KEY,timeoutMs:config.AI_TIMEOUT_MS}),config.AI_ENABLED&&!!config.GROQ_API_KEY));
   app.use('/api/v1/workspaces/:workspaceId/forecasts', forecastRoutes(pool, forecastRunner));
   app.use('/api/v1/workspaces/:workspaceId/planning', planningRoutes(pool));
   app.use('/api/v1/workspaces/:workspaceId/scenarios', scenarioRoutes(pool));

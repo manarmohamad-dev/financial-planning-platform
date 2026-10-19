@@ -1,6 +1,14 @@
 # Explainable Financial Decision Simulator for SMEs
 
-Implemented M1–M6: isolated workspaces, deterministic financial planning, versioned decision scenarios, reviewed XLSX/CSV imports, and evidence-based statistical forecasts with approved hybrid baselines. M6 adds deterministic stress/risk/decision evidence. Statistical forecasting is optional. No AI/LLM functionality is implemented; M7–M9 have not started.
+Implemented M1–M6: isolated workspaces, deterministic financial planning, versioned decision scenarios, reviewed XLSX/CSV imports, and evidence-based statistical forecasts with approved hybrid baselines. M6 adds deterministic stress/risk/decision evidence. Statistical forecasting is optional. M7 is accepted under its revised scope: Guided Input scenario creation and evidence-grounded AI assistance. M8 release verification is documented in [M8 fix closure](docs/M8-FIX-CLOSURE.md); deployment has not been approved or performed.
+
+### What AI does—and what it does not do
+
+- Guided Input is deterministic, reviewed form entry. It is not natural-language AI extraction.
+- The Financial Engine alone calculates financial amounts and differences. Python statistical forecasting is a separate, bounded statistical process.
+- Groq assistance reviews existing assumptions, selects approved saved-result evidence, interprets actual risk-check findings, and supports Decision Brief explanations. It does not propose missing assumptions, calculate financial outcomes, or make autonomous decisions.
+- New free-text scenario extraction failed acceptance and is disabled at both UI and API/service boundaries. Authorized historical AI records remain readable.
+- Missing inputs remain unknown. Provider absence, failure, or rejected output leaves manual planning and deterministic evidence available. See [accepted M7 evidence](docs/M7-FINAL-ACCEPTANCE.md).
 
 For the current page-composition verification, see [the density report](docs/DENSITY-COMPOSITION-REPORT.md). Earlier milestone and UI reports are historical evidence, not a claim that every later revision repeated their checks. See [Week 3 deployment and review](docs/WEEK3-DEPLOYMENT.md) for production requirements and instructor access.
 
@@ -84,7 +92,7 @@ See [M3 contract and API](docs/M3-CONTRACTS.md) and [M3 completion report](docs/
 
 ## Scope and release status
 
-See `docs/DENSITY-COMPOSITION-REPORT.md` for the latest pre-submission verification and `docs/M4-CONTRACTS.md` for import limits, API and financial interpretation. Earlier milestone reports are historical. This remains a development MVP. Email verification, password recovery, production deployment, retention/deletion, distributed background job scheduling and LLM integration are not implemented. Creating a company never copies demo data.
+See `docs/M8-FIX-CLOSURE.md` for current release verification and `docs/M4-CONTRACTS.md` for import limits, API and financial interpretation. Earlier milestone reports are historical. This remains a development MVP. Email verification, password recovery, production deployment, retention/deletion and distributed background job scheduling are not implemented. Creating a company never copies demo data.
 
 For M4: enter a company workspace as Owner or Analyst → **Data & Imports**. Upload a values-only XLSX or UTF-8 CSV, review every source column and financial meaning, validate and explicitly confirm. Use the resulting confirmed planning version in the existing baseline workflow, then select that published baseline in Decisions. Managers can inspect/use confirmed imported data but cannot upload or confirm mappings. Synthetic acceptance files are under `tests/fixtures/imports`.
 
@@ -102,7 +110,7 @@ See [M5 architecture and contracts](docs/M5-CONTRACTS.md) and [M5 completion rep
 
 Use **Risk Center** in a company workspace. Choose a published baseline run or a completed scenario, use an explicitly confirmed risk policy, review supported revenue/cost/collection-delay modifications and confirm immutable versions. Prepare and run a batch, inspect individual failures and successful evidence, compare compatible results, then generate a deterministic decision brief. Historical briefs can be reopened and verified. Only an Owner with `risk.edit` can create workspace policy versions.
 
-See [M6 contracts](docs/M6-CONTRACTS.md) and [M6 verification report](docs/M6-REPORT.md). That report records the M6 acceptance results at the time. The current pre-submission baseline is 489 passing automated tests. M7 has not started and is outside Week 3 scope.
+See [M6 contracts](docs/M6-CONTRACTS.md) and [M6 verification report](docs/M6-REPORT.md). That report records the M6 acceptance results at the time. The former Week 3 baseline was 489 tests. The current release includes accepted revised-scope M7 and has 621 automated tests plus 6 independent Python tests; see the release verification report.
 
 ## Instructor walkthrough
 
@@ -114,6 +122,11 @@ For company screens, create your own company workspace using the existing flow. 
 
 - Start with this README, [security boundaries](docs/SECURITY.md), and [deployment requirements](docs/WEEK3-DEPLOYMENT.md).
 - `docs/M*-CONTRACTS.md` and architecture documents describe the implemented contracts.
-- Milestone/UI reports and `docs/evidence/` are dated verification evidence; keep them for traceability.
-- `output/pdf/` contains final historical PDF evidence. `tmp/` and `.local/` are ignored scratch/runtime artifacts, not submission source.
+- Milestone/UI reports are dated verification records. Raw `docs/evidence/` captures are preserved locally and excluded from the GitHub release to avoid publishing diagnostic or private artifacts.
+- `output/`, `out/`, `tmp/` and `.local/` are ignored local evidence/experiment/runtime artifacts, not production source. Required synthetic product screenshots are versioned under `apps/web/public/`.
 - `scripts/saas-preview.ts` is local-only synthetic acceptance tooling, not a public production entry point. It writes synthetic access details under ignored `.local/`.
+
+## Release and Render preparation
+
+See [Render Free readiness](docs/M9-RENDER-FREE-READINESS.md) and [GitHub release verification](docs/M9-GITHUB-RELEASE-REPORT.md). The full-stack Dockerfile builds Angular and Express and includes Python. Docker/Linux resource qualification remains unverified; no deployment is implied by a local release commit.
+

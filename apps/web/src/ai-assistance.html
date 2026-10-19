@@ -1,0 +1,130 @@
+<details class="card workbench-history" data-record-picker>
+  <summary>{{ assistanceLabel | t }}</summary>
+  @if (!historyOnly) {
+  <p class="muted">
+    {{ 'AI reviews recorded assumptions and explains saved evidence. Financial calculations and decisions remain
+    in the reviewed manual workflow.' | t }}
+  </p>
+  <p class="muted">{{ 'Financial findings are calculated by the engine. AI selects saved evidence; explanations are checked against that evidence.' | t }}</p>
+  @if (!available()) {
+  <p role="status">{{ 'AI is unavailable. Continue using all manual tools.' | t }}</p>
+  }
+  <label
+    >{{ 'What would you like to understand about this evidence? (optional)' | t }}
+    <textarea [(ngModel)]="text" maxlength="4000" [disabled]="busy()" rows="3"></textarea>
+  </label>
+  <p class="muted">
+    {{ 'Groq receives your text and selected financial evidence. Do not include personal information
+    or secrets.' | t }}
+  </p>
+  <button (click)="previewContext()" [disabled]="busy()">
+    {{ 'Preview outgoing context' | t }}
+  </button>
+  @if (preview()) {
+  <details open>
+    <summary>{{ 'Preview outgoing context' | t }}</summary>
+    <pre dir="auto">{{ preview() | json }}</pre>
+  </details>
+  }
+  <label
+    ><input type="checkbox" [(ngModel)]="consent" [disabled]="busy()" />{{ 'I agree to send this
+    context to Groq for assistance.' | t }}</label
+  >
+  }
+  @if (artifact(); as a) {
+  <p>{{ a.output.summary }}</p>
+  @for (q of a.output.questions; track q.id) {
+  <label
+    >{{ q.question }}<input [(ngModel)]="answers[q.id]" maxlength="500" [disabled]="busy()"
+  /></label>
+  } @for (w of a.output.warnings; track $index) {
+  <p class="muted">{{ w.message }}</p>
+  } @for (issue of issues(); track $index) {
+  <p>{{ issue.message }} {{ issue.question }}
+    @for (ref of issue.evidenceRefs; track ref) { @if (fact(ref); as evidence) { <span class="ai-fact"><bdi>{{ evidence.label | t }}: {{ evidence.value }} {{ evidence.unit }} {{ evidence.period }}</bdi></span> } }
+  </p>
+  } @if (narrative(); as n) { @for (section of n.sections; track $index) {
+  <h3>{{ section.heading }}</h3>
+  <p>
+    @for (segment of section.segments; track $index) { @if (segment.kind === 'text') { {{
+    segment.text }} } @else if (fact(segment.factRef); as f) {
+    <span class="ai-fact">{{ f.label | t }}: <bdi>{{ f.value }} {{ f.unit }} {{ f.period }}</bdi></span> } }
+  </p>
+  } @for (limitation of n.limitations; track $index) {
+  <p class="muted">{{ limitation }}</p>
+  } } @if (a.proposal) {
+  <h3>{{ 'Review proposal before creating a draft' | t }}</h3>
+  @for (change of reviewedProposal()?.changes ?? []; track change.id) {
+  <article class="list-record">
+    <strong>{{ change.label }}</strong>
+    <p>{{ change.source.note }}</p>
+    @if (change.primitive.kind === 'adjust') {
+    <p>
+      <bdi>{{ change.primitive.start }} — {{ change.primitive.end }}</bdi> · {{
+      operationLabel(change.primitive.operation) | t }}
+      @if (change.primitive.operation !== 'remove') { · <bdi>{{ change.primitive.value }}</bdi>
+      {{ change.primitive.operation.startsWith('percentage_') ? ('Decimal ratio' | t) : change.currency }} }
+    </p>
+    } @else {
+    <p>
+      <bdi>{{ change.primitive.entry.start }} — {{ change.primitive.entry.end }}</bdi> · {{
+      change.primitive.entry.category | t }} · {{ change.currency }}
+    </p>
+    <pre>{{ change.primitive.entry.driver | json }}</pre>
+    }
+  </article>
+  }
+  <details>
+    <summary>{{ 'Edit structured proposal' | t }}</summary>
+    <label
+      >{{ 'Review proposal before creating a draft' | t }}<textarea
+        [(ngModel)]="proposal"
+        rows="12"
+        dir="ltr"
+        [disabled]="busy()"
+      ></textarea>
+    </label>
+  </details>
+  <label
+    ><input type="checkbox" [(ngModel)]="reviewed" [disabled]="busy()" />{{ 'I reviewed the inputs.
+    Create a draft only; do not calculate or publish.' | t }}</label
+  >
+  <button (click)="apply()" [disabled]="busy() || !reviewed || !reviewedProposal()">
+    {{ 'Create reviewed draft' | t }}
+  </button>
+  }
+  <details>
+    <summary>{{ 'Source assignments and lineage' | t }}</summary>
+    <p><bdi>{{ a.id }} · {{ a.model }} · {{ a.source_ref.id }}</bdi></p>
+    <pre>{{ a.evidence | json }}</pre>
+  </details>
+  @if (!historyOnly) {<button (click)="restart()" [disabled]="busy()">
+    {{ 'Start a new assistance request' | t }}
+  </button>}
+  }
+  @if (!historyOnly) {<button
+    [attr.aria-describedby]="!historyOnly && !busy() && available() && !consent ? 'ai-request-help-' + task + '-' + source.id : null"
+    (click)="generate()"
+    [disabled]="busy() || !available() || !consent || (task === 'scenario_extract' && !text.trim())"
+  >
+    {{ (busy() ? 'Preparing assistance…' : 'Request assistance') | t }}
+  </button>}
+  @if(!historyOnly && !busy() && available() && !consent){<p [attr.id]="'ai-request-help-' + task + '-' + source.id" class="action-hint">{{ 'Review the context and select the consent checkbox to request an explanation.' | t }}</p>}
+  @if (busy()) {
+  <p role="status" aria-live="polite">{{ 'Preparing assistance…' | t }}</p>
+  } @if (error()) {
+  <p role="alert">{{ error() | t }}</p>
+  } @if (history().length) {
+  <details>
+    <summary>{{ 'Saved AI assistance' | t }}</summary>
+    @for (item of history(); track item.id) {<button
+      (click)="openArtifact(item.id)"
+      [disabled]="busy()"
+    >
+      <bdi>{{ item.created_at }}</bdi> · {{ item.locale }} · {{ item.outcome | t }}</button
+    >}
+  </details>
+  }
+</details>
+
+

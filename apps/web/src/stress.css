@@ -125,6 +125,7 @@ small {
   .brief-limitations {
     break-inside: avoid;
   }
+  .page-heading,
   .stress-workflow,
   .brief-controls {
     display: none !important;
@@ -172,6 +173,6 @@ small {
     overflow: visible;
   }
   .decision-brief .brief-option {
-    break-before: page;
+    break-before: auto;
   }
 }

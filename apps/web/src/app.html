@@ -19,6 +19,7 @@
 </div>
 }
 <router-outlet />
+@if(landing()) { @defer(on immediate) { <public-landing [signedIn]="!!user()" /> } @placeholder { <main><p role="status">{{'Please wait…'|t}}</p></main> } } @else {
 <div
   class="app"
   [attr.inert]="navigation.prompt() ? '' : null"
@@ -364,6 +365,10 @@
           can support your plan.'|t}}
         </p>
         @if(setup();as s){
+        <div class="setup-next" role="status"><strong>{{'Next step'|t}}</strong><p>{{(!s.versions?'Start with a reviewed import or explicit planning inputs.':!s.published?'Review and publish a baseline before creating a scenario.':!s.scenarios?'Your baseline is ready. Create and review a scenario.':!s.briefs?'Review risk findings, then prepare a decision brief.':'Your decision journey is saved. Review the results or explore another decision.')|t}}</p>
+          <button class="primary" (click)="go(!s.versions?'imports':!s.published?'planning':!s.scenarios?'decisions':!s.briefs?'stress':'briefs')">{{'Continue setup'|t}}</button>
+          @if(!s.versions){<button (click)="go('planning')">{{'Plan with explicit inputs instead'|t}}</button>}
+        </div>
         <ol>
           <li>
             <button (click)="go('imports')">{{'Data & Imports'|t}}</button>
@@ -551,3 +556,4 @@
     <span> {{ "Financial planning, with context." | t }} </span>
   </footer>
 </div>
+}

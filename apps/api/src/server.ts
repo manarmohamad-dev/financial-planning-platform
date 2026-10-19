@@ -6,7 +6,9 @@ const config = readConfig(process.env);
 const pool = createPool(config.DATABASE_URL);
 await pool.query('SELECT 1');
 const app = await createApp(config, pool);
-const server = app.listen(config.PORT, () => logger.info({ port: config.PORT }, 'API ready'));
+const server = app.listen({ port: config.PORT, host: config.BIND_HOST }, () =>
+  logger.info({ port: config.PORT }, 'API ready'),
+);
 for (const signal of ['SIGINT', 'SIGTERM'])
   process.on(signal, () => {
     server.close(() => {

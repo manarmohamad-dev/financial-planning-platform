@@ -1,8 +1,10 @@
+import { canStartGuidedEntry, guidedDecisionTypes } from './guided-entry.js';
+import { AiAssistance } from './ai-assistance.js';
 import { RecordHistory, WorkflowStages, FinancialMetric } from './ui';
 import { InPageLink } from './in-page';
 import { NavigationState, type Journey, type RecordContext } from './navigation';
 import { inject, HostListener, Output, EventEmitter } from '@angular/core';
-import { TranslatePipe, MoneyPipe, LocaleService } from './i18n';
+import { TranslatePipe, MoneyPipe, LocaleService } from './i18n.js';
 import { FinancialChart } from './ui';
 import { comparisonMetrics } from '../../../packages/scenarios/src/metrics';
 import { Component, Input, OnChanges, signal } from '@angular/core';
@@ -25,7 +27,7 @@ type Comparison = {
 @Component({
   selector: 'decision-workbench',
   standalone: true,
-  imports: [
+  imports: [AiAssistance,
     RecordHistory,
     WorkflowStages,
     FinancialMetric,
@@ -43,7 +45,12 @@ export class DecisionWorkbench implements OnChanges {
   @Output() navigate = new EventEmitter<Journey>();
   readonly locale = inject(LocaleService);
   readonly navigation = inject(NavigationState);
+  private guidedEdited = false;
+  @HostListener('change', ['$event']) rememberGuidedEdit(event: Event) {
+    if (!(event.target as HTMLElement).closest('[data-record-picker]')) this.guidedEdited = true;
+  }
   @HostListener('input', ['$event']) markEdited(event: Event) {
+    this.rememberGuidedEdit(event);
     if (!(event.target as HTMLElement).closest('[data-record-picker]'))
       this.navigation.dirty.set(true);
   }
@@ -82,6 +89,26 @@ export class DecisionWorkbench implements OnChanges {
   runId = '';
   approved = false;
   demoType = 'sales';
+  guidedEntry = false;
+  readonly guidedTypes = guidedDecisionTypes;
+  startGuidedEntry(type: typeof guidedDecisionTypes[number]) {
+    if (this.busy() || !this.can('scenario.edit') || !this.baseline()) return;
+    this.guidedEntry = true;
+    if (canStartGuidedEntry(this.document, this.draftId, [this.label, this.component, this.target, this.value, this.amount, this.count, this.monthlyCost, this.onboarding, this.note, this.reference, this.rate, this.baseComponent, this.timing, this.editId, this.guidedEdited ? 'edited' : ''])) {
+      this.document.type = type;
+      this.typeChanged();
+      this.notice.set('Enter each input explicitly, then review and save. No AI request was made.');
+    } else {
+      this.notice.set('Your current draft and unsaved inputs are preserved. Continue reviewing them in the editor.');
+    }
+    requestAnimationFrame(() => {
+      const heading = document.getElementById('scenario-decision');
+      const editor = heading?.closest('details');
+      if (editor) editor.open = true;
+      heading?.focus();
+      heading?.scrollIntoView({ block: 'start', behavior: 'instant' });
+    });
+  }
   selected: string[] = [];
   comparisonTitle = 'Decision alternatives';
   editId = '';
@@ -141,6 +168,8 @@ export class DecisionWorkbench implements OnChanges {
     };
   }
   ngOnChanges() {
+    this.guidedEntry = false;
+    this.guidedEdited = false;
     this.document = this.empty();
     this.baseline.set(null);
     this.draftId = '';
@@ -230,6 +259,7 @@ export class DecisionWorkbench implements OnChanges {
     });
   }
   newDraft() {
+    this.guidedEdited = false;
     this.result.set(null);
     this.evidence.set(null);
     this.notice.set('');

@@ -22,3 +22,14 @@ __pycache__/
 *.pfx
 *.sql.dump
 *.dump
+
+# Local acceptance captures, raw model experiments and laptop-only launcher.
+/docs/evidence/
+/out/
+/output/
+/Demo.cmd
+# Local credential exports (never application source).
+*.secret
+*.secrets
+credentials.json
+service-account*.json

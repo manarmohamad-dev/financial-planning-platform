@@ -21,7 +21,19 @@
     <h1>{{'Risk Center & Stress Analysis'|t}}</h1>
   </div>
 </div>
-} @if(briefOnly){
+} @if (workspace.permissions?.includes('ai.use')) { @if (brief(); as savedBrief) {
+<ai-assistance
+  [workspaceId]="workspace.id"
+  [source]="{kind:'decision_brief',id:savedBrief.id,revision:null}"
+  task="brief_narrative"
+/>
+} @else if (comparison(); as savedComparison) {
+<ai-assistance
+  [workspaceId]="workspace.id"
+  [source]="{kind:'stress_comparison',id:savedComparison.id,revision:null}"
+  task="result_explain"
+/>
+} } @if(briefOnly){
 <div class="density-page brief-density brief-controls">
   <div class="density-grid">
     <section class="card density-start">
@@ -398,7 +410,7 @@
       <label> {{ "Stress case name" | t }} <input [(ngModel)]="title" /></label> @for(m of
       modifications;track m.id){
       <div class="modification">
-        <h3>{{m.kind.replaceAll('_',' ')}} · {{label(m.targetEntryId)}}</h3>
+        <h3>{{(m.kind==='revenue_decrease'?'Revenue decrease':m.kind==='expense_increase'?'Expense increase':'Collection delay')|t}} · {{label(m.targetEntryId)}}</h3>
         <div class="stress-grid">
           <label>
             {{ "First month" | t }}
@@ -488,6 +500,7 @@
       >
         {{ "Prepare stress batch" | t }}
       </button>
+      @if(!policyId||!caseIds.size||caseIds.size>8){<p class="action-hint">{{ 'Choose a risk policy and one to eight reviewed stress cases to prepare a batch.' | t }}</p>}
     </fieldset>
     @if(batch();as b){
     <section class="card">
@@ -542,6 +555,7 @@
       }<button class="primary" (click)="compare()" [disabled]="!batchIds.size||batchIds.size>3">
         {{ "Compare selected batches" | t }}
       </button>
+      @if(!batchIds.size||batchIds.size>3){<p class="action-hint">{{ 'Select one to three completed batches with compatible sources and risk policy.' | t }}</p>}
     </fieldset>
     @if(evidence()){
     <details open class="card">
