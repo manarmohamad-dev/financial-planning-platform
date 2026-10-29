@@ -1,4 +1,5 @@
 import { InPageLink } from './in-page';
+import { GoogleSignIn, type GoogleAuthResult } from './google-sign-in';
 import { PublicLanding } from './landing';
 import {
   NavigationEnd,
@@ -51,6 +52,7 @@ type AuditEvent = {
   selector: 'app-root',
   standalone: true,
   imports: [
+    GoogleSignIn,
     PublicLanding,
     InPageLink,
     RouterOutlet,
@@ -67,6 +69,23 @@ type AuditEvent = {
   templateUrl: './app.html',
 })
 class App {
+  readonly googleRequest = <T>(path: string, method = 'GET', body?: unknown) => this.api<T>(path, method, body);
+  googlePassword = '';
+  googleLink = signal(false);
+  async acceptGoogle(result: GoogleAuthResult) {
+    await this.perform(async () => {
+      this.csrf = result.csrfToken;
+      this.user.set(result.user);
+      this.password = '';
+      await this.refresh();
+      await this.navigation.go(null);
+    });
+  }
+  finishGoogleLink() {
+    this.googlePassword = '';
+    this.googleLink.set(false);
+    this.notice.set('Google account connected successfully.');
+  }
   landing = signal(window.location.pathname === '/');
   readonly navigation = inject(NavigationState);
   readonly router = inject(Router);

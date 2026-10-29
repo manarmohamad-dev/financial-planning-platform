@@ -190,6 +190,54 @@ afterAll(async () => {
 });
 
 describe('real authentication and sessions', () => {
+  it('creates a Google-only user without granting workspace access and rejects foreign or expired proofs', async () => {
+    const email = `google-new-${randomUUID()}@example.test`;
+    const googleApp = await createApp(readConfig({
+      NODE_ENV: 'test', APP_ORIGIN: origin, DATABASE_URL: 'postgresql://test-only/unused',
+      SESSION_SECRET: randomBytes(48).toString('hex'), GOOGLE_AUTH_ENABLED: 'true', GOOGLE_CLIENT_ID: 'test-only-not-a-live-client',
+    }), pool, undefined, undefined, async () => ({ subject: randomUUID(), email, name: 'Synthetic Google' }));
+    const a = request.agent(googleApp), b = request.agent(googleApp);
+    const csrf = (await a.get('/api/v1/auth/csrf')).body.token;
+    const otherCsrf = (await b.get('/api/v1/auth/csrf')).body.token;
+    const send = (path: string, body: object = {}) => a.post('/api/v1/auth/google' + path).set('Origin', origin).set('X-CSRF-Token', csrf).send(body);
+    const nonce = (await send('/challenge').expect(200)).body.nonce;
+    await b.post('/api/v1/auth/google').set('Origin', origin).set('X-CSRF-Token', otherCsrf).send({ nonce, credential: 'test-provider-credential-only' }).expect(401);
+    const result = await send('', { nonce, credential: 'test-provider-credential-only' }).expect(200);
+    expect(result.body.user.email).toBe(email);
+    expect((await a.get('/api/v1/workspaces')).body.workspaces).toEqual([]);
+    expect((await admin.query('SELECT password_hash FROM users WHERE id=$1', [result.body.user.id])).rows[0].password_hash).toBeNull();
+    const expired = (await b.post('/api/v1/auth/google/challenge').set('Origin', origin).set('X-CSRF-Token', otherCsrf).send({}).expect(200)).body.nonce;
+    await admin.query("UPDATE google_auth_challenges SET expires_at=now()-interval '1 minute'");
+    await b.post('/api/v1/auth/google').set('Origin', origin).set('X-CSRF-Token', otherCsrf).send({ nonce: expired, credential: 'test-provider-credential-only' }).expect(401);
+  });
+  it('Google requires session CSRF, explicit linking and a single-use nonce', async () => {
+    // An injected provider proof tests application security; this is not a live Google login.
+    const owner = await client('google-link');
+    const googleApp = await createApp(readConfig({
+      NODE_ENV: 'test', APP_ORIGIN: origin, DATABASE_URL: 'postgresql://test-only/unused',
+      SESSION_SECRET: randomBytes(48).toString('hex'), GOOGLE_AUTH_ENABLED: 'true', GOOGLE_CLIENT_ID: 'test-only-not-a-live-client',
+    }), pool, undefined, undefined, async () => ({ subject: 'test-subject', email: owner.email, name: 'Test Google' }));
+    const agent = request.agent(googleApp);
+    let csrf = (await agent.get('/api/v1/auth/csrf')).body.token;
+    const send = (path: string, body: object = {}) => agent.post('/api/v1/auth/google' + path).set('Origin', origin).set('X-CSRF-Token', csrf).send(body);
+    await agent.post('/api/v1/auth/google/challenge').send({}).expect(403);
+    let nonce = (await send('/challenge').expect(200)).body.nonce;
+    await send('', { credential: 'test-provider-credential-only', nonce }).expect(409).expect(r => expect(r.body.error.code).toBe('GOOGLE_LINK_REQUIRED'));
+    await send('', { credential: 'test-provider-credential-only', nonce }).expect(401);
+    const login = await agent.post('/api/v1/auth/login').set('Origin', origin).set('X-CSRF-Token', csrf).send({ email: owner.email, password: 'Foundation-password-123' }).expect(200);
+    csrf = login.body.csrfToken;
+    nonce = (await send('/challenge').expect(200)).body.nonce;
+    await send('/link', { credential: 'test-provider-credential-only', nonce, password: 'wrong-password' }).expect(401);
+    nonce = (await send('/challenge').expect(200)).body.nonce;
+    await send('/link', { credential: 'test-provider-credential-only', nonce, password: 'Foundation-password-123' }).expect(200);
+    await agent.post('/api/v1/auth/logout').set('Origin', origin).set('X-CSRF-Token', csrf).expect(204);
+    csrf = (await agent.get('/api/v1/auth/csrf')).body.token;
+    nonce = (await send('/challenge').expect(200)).body.nonce;
+    const signedIn = await send('', { credential: 'test-provider-credential-only', nonce }).expect(200);
+    expect(signedIn.body.user.id).toBe(owner.id);
+    await agent.get('/api/v1/auth/me').expect(200);
+    expect((await agent.get('/api/v1/workspaces')).body.workspaces).toEqual([]);
+  });
   it('registers, reads user, logs out, rejects old session, logs in again', async () => {
     const c = await client('lifecycle');
     await c.agent.get('/api/v1/auth/me').expect(200);
@@ -453,7 +501,7 @@ describe('versions, concurrency, invitations and audit', () => {
   it('has clean migrations and exact numeric support', async () => {
     expect(
       (await admin.query('SELECT name FROM schema_migrations ORDER BY name')).rows,
-    ).toHaveLength(9);
+    ).toHaveLength(10);
     expect(
       (await pool.query("SELECT '0.1'::numeric(24,6)+'0.2'::numeric(24,6) AS total")).rows[0].total,
     ).toBe('0.300000');

@@ -143,6 +143,7 @@
           >
         </button>
       </form>
+      <google-sign-in [request]="googleRequest" (authenticated)="acceptGoogle($event)" />
       <button class="text-button full" (click)="authMode()">
         {{ (registering ? 'Already have an account? Sign in' : 'New here? Create an account') | t }}
       </button>
@@ -159,6 +160,13 @@
         browser.'|t}}
       </p>
       <button (click)="allWorkspaces()">{{'All workspaces'|t}}</button>
+      <h3>{{'Connect your Google account'|t}}</h3>
+      <p>{{'Confirm your current password, then choose Google with the same email.'|t}}</p>
+      <label>{{'Current password'|t}}<input type="password" autocomplete="current-password" maxlength="128" [(ngModel)]="googlePassword" /></label>
+      <button type="button" [disabled]="!googlePassword || googleLink()" (click)="googleLink.set(true)">{{'Connect Google account'|t}}</button>
+      @if(googleLink()) {
+        <google-sign-in [request]="googleRequest" [password]="googlePassword" (linked)="finishGoogleLink()" />
+      }
     </section>
   </main>
   } @else if (routeLoading()) {

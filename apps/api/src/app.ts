@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs';
+import { googleAuthRoutes, type GoogleVerifier } from './google-auth.js';
 import { aiRoutes } from './ai-routes.js';
 import { createGroqProvider, type AiProvider } from './ai-provider.js';
 import { resolve } from 'node:path';
@@ -64,7 +65,7 @@ const requireUser = (req: Request) => {
 };
 const rid = (res: Response): string => res.locals.requestId;
 
-export async function createApp(config: Config, pool: Pool, forecastRunner?: ForecastRunner, aiProvider?: AiProvider) {
+export async function createApp(config: Config, pool: Pool, forecastRunner?: ForecastRunner, aiProvider?: AiProvider, googleVerifier?: GoogleVerifier) {
   const databaseRole = (
     await pool.query(
       "SELECT r.rolsuper,r.rolbypassrls,EXISTS(SELECT 1 FROM pg_tables WHERE schemaname='public' AND tablename='workspaces' AND tableowner=current_user) AS owns_business_tables FROM pg_roles r WHERE r.rolname=current_user",
@@ -126,7 +127,16 @@ export async function createApp(config: Config, pool: Pool, forecastRunner?: For
     );
     next();
   });
-  app.use(helmet());
+  app.use(helmet(config.GOOGLE_AUTH_ENABLED ? {
+    referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+    crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
+    contentSecurityPolicy: { directives: {
+      scriptSrc: ["'self'", 'https://accounts.google.com/gsi/client'],
+      frameSrc: ["'self'", 'https://accounts.google.com/gsi/'],
+      connectSrc: ["'self'", 'https://accounts.google.com/gsi/'],
+      styleSrc: ["'self'", "'unsafe-inline'", 'https://accounts.google.com/gsi/style'],
+    } },
+  } : {}));
   app.use(express.json({ limit: '64kb', strict: true }));
   const limiter = rateLimit({
     windowMs: 60000,
@@ -196,6 +206,7 @@ export async function createApp(config: Config, pool: Pool, forecastRunner?: For
         },
       }),
   });
+  googleAuthRoutes(app, config, pool, authLimiter, googleVerifier);
   app.post('/api/v1/auth/register', authLimiter, async (req, res) => {
     const input = registration.parse(req.body);
     const id = randomUUID();
